@@ -69,7 +69,6 @@ const createSale = async (
             }
             s.type = type;
             s.soldAt = soldAt;
-            s.createdAt = Date.now();
             s.updatedAt = Date.now();
         });
 
@@ -101,7 +100,6 @@ const createSale = async (
                 si.quantity = quantity;
                 si.sellingPrice = sellingPrice;
                 si.costPrice = costPricePerUnit;
-                si.createdAt = Date.now();
                 si.updatedAt = Date.now();
             });
         }

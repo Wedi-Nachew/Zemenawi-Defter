@@ -1,5 +1,5 @@
-import { router, Stack } from "expo-router";
-import { useEffect, useState } from "react";
+import { router, Stack, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import { FlatList, StyleSheet, View } from "react-native";
 import {
     Card,
@@ -21,31 +21,42 @@ const ProductsScreen = () => {
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState("all");
 
-    useEffect(() => {
+    const loadProducts = useCallback(async () => {
         let active = true;
-
-        const loadProducts = async () => {
-            setLoading(true);
-            try {
-                const result = await getProducts({
-                    search: query.trim(),
-                    filter,
-                });
-                if (!active) return;
-                setProducts(result);
-            } catch (error) {
-                console.error("Failed to load products", error);
-            } finally {
-                if (active) setLoading(false);
-            }
-        };
-
-        loadProducts();
+        setLoading(true);
+        try {
+            const result = await getProducts({
+                search: query.trim(),
+                filter,
+            });
+            if (!active) return;
+            setProducts(result);
+        } catch (error) {
+            console.error("Failed to load products", error);
+        } finally {
+            if (active) setLoading(false);
+        }
 
         return () => {
             active = false;
         };
     }, [query, filter]);
+
+    useEffect(() => {
+        const cleanup = loadProducts();
+        return () => {
+            if (typeof cleanup === "function") cleanup();
+        };
+    }, [loadProducts]);
+
+    useFocusEffect(
+        useCallback(() => {
+            const cleanup = loadProducts();
+            return () => {
+                if (typeof cleanup === "function") cleanup();
+            };
+        }, [loadProducts]),
+    );
 
     const renderItem = ({ item }) => {
         const status = getStockStatus(item.stock);

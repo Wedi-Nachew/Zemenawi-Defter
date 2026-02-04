@@ -16,6 +16,12 @@ import {
     TextInput,
 } from "react-native-paper";
 import Screen from "../../../src/components/Screen";
+import database from "../../../src/database";
+import {
+    addStock,
+    deleteBatch,
+    updateBatch,
+} from "../../../src/services/inventoryService";
 import {
     deleteProduct,
     getProductBatches,
@@ -38,6 +44,9 @@ const ProductDetails = () => {
     const [productName, setProductName] = useState("");
     const [productUnit, setProductUnit] = useState("");
     const [productPrice, setProductPrice] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
+    const [batchDeleting, setBatchDeleting] = useState(false);
 
     useEffect(() => {
         let active = true;
@@ -65,18 +74,7 @@ const ProductDetails = () => {
         };
     }, [id]);
 
-    const displayBatches = useMemo(
-        () =>
-            batches.map((batch) => ({
-                id: batch.id,
-                remaining: batch.remainingQuantity ?? 0,
-                purchasePrice: batch.purchasePrice ?? 0,
-                date: batch.purchasedAt
-                    ? new Date(batch.purchasedAt).toLocaleDateString()
-                    : "",
-            })),
-        [batches],
-    );
+    const displayBatches = useMemo(() => batches, [batches]);
 
     if (!product) {
         return (
@@ -137,10 +135,19 @@ const ProductDetails = () => {
 
     const openEditBatch = (batch) => {
         setSelectedBatch(batch);
-        setQty(String(batch.remaining));
-        setCost(String(batch.purchasePrice));
-        setDateReceived(batch.date);
+        setQty(String(batch.remainingQuantity ?? 0));
+        setCost(String(batch.purchasePrice ?? 0));
+        setDateReceived(
+            batch.purchasedAt
+                ? new Date(batch.purchasedAt).toLocaleDateString()
+                : "",
+        );
         setSheet("edit-stock");
+    };
+
+    const openDeleteBatch = (batch) => {
+        setSelectedBatch(batch);
+        setBatchDeleteOpen(true);
     };
 
     const openDeleteProductConfirmation = () => {
@@ -159,6 +166,70 @@ const ProductDetails = () => {
             console.error("Failed to delete product", error);
         } finally {
             setDeleting(false);
+        }
+    };
+
+    const reloadProduct = async () => {
+        if (typeof id !== "string") return;
+        const result = await getProductById(id);
+        const batchRows = await getProductBatches(id);
+        setProduct(result);
+        setBatches(batchRows);
+    };
+
+    const handleSaveSheet = async () => {
+        if (!product) return;
+        setSaving(true);
+        try {
+            if (sheet === "edit-product") {
+                const parsedPrice = Number(
+                    String(productPrice).replace(/,/g, ""),
+                );
+                await database.write(async () => {
+                    await product.update((p) => {
+                        p.name = productName.trim();
+                        p.unit = productUnit.trim();
+                        p.defaultSellingPrice = parsedPrice || 0;
+                        p.updatedAt = Date.now();
+                    });
+                });
+            } else if (sheet === "edit-stock" && selectedBatch) {
+                await updateBatch(selectedBatch, {
+                    purchasePrice: Number(String(cost).replace(/,/g, "")) || 0,
+                    remainingQuantity:
+                        Number(String(qty).replace(/,/g, "")) || 0,
+                    purchasedAt: Date.parse(dateReceived) || Date.now(),
+                });
+            } else if (sheet === "add-stock") {
+                await addStock(
+                    product,
+                    Number(String(cost).replace(/,/g, "")) || 0,
+                    Number(String(qty).replace(/,/g, "")) || 0,
+                    Date.parse(dateReceived) || Date.now(),
+                );
+            }
+
+            await reloadProduct();
+            setSheet(null);
+        } catch (error) {
+            console.error("Failed to save changes", error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDeleteBatch = async () => {
+        if (!selectedBatch) return;
+        setBatchDeleting(true);
+        try {
+            await deleteBatch(selectedBatch);
+            await reloadProduct();
+            setBatchDeleteOpen(false);
+            setSelectedBatch(null);
+        } catch (error) {
+            console.error("Failed to delete batch", error);
+        } finally {
+            setBatchDeleting(false);
         }
     };
 
@@ -313,26 +384,43 @@ const ProductDetails = () => {
                                         <View style={styles.batchRow}>
                                             <View>
                                                 <Text style={styles.title}>
-                                                    {batch.date}
+                                                    {batch.purchasedAt
+                                                        ? new Date(
+                                                              batch.purchasedAt,
+                                                          ).toLocaleDateString()
+                                                        : ""}
                                                 </Text>
                                                 <Text style={styles.meta}>
-                                                    {batch.remaining} left
+                                                    {batch.remainingQuantity ??
+                                                        0}{" "}
+                                                    left
                                                 </Text>
                                             </View>
-                                            <Button
-                                                mode="outlined"
-                                                compact
-                                                icon="pencil"
-                                                onPress={() =>
-                                                    openEditBatch(batch)
-                                                }
-                                            >
-                                                Edit Stock
-                                            </Button>
+                                            <View style={styles.batchActions}>
+                                                <IconButton
+                                                    icon="pencil"
+                                                    size={18}
+                                                    onPress={() =>
+                                                        openEditBatch(batch)
+                                                    }
+                                                />
+                                                <IconButton
+                                                    icon="trash-can-outline"
+                                                    size={18}
+                                                    iconColor={
+                                                        theme.colors.error
+                                                    }
+                                                    onPress={() =>
+                                                        openDeleteBatch(batch)
+                                                    }
+                                                />
+                                            </View>
                                         </View>
                                         <Text style={styles.meta}>
                                             Purchase ETB{" "}
-                                            {batch.purchasePrice.toLocaleString()}
+                                            {(
+                                                batch.purchasePrice ?? 0
+                                            ).toLocaleString()}
                                         </Text>
                                         {idx < displayBatches.length - 1 && (
                                             <Divider
@@ -418,6 +506,39 @@ const ProductDetails = () => {
                                 }}
                             >
                                 OK
+                            </Button>
+                        </Dialog.Actions>
+                    </Dialog>
+                    <Dialog
+                        visible={batchDeleteOpen}
+                        onDismiss={() => setBatchDeleteOpen(false)}
+                        style={styles.dialog}
+                    >
+                        <Dialog.Title style={styles.dialogTitle}>
+                            Delete batch?
+                        </Dialog.Title>
+                        <Dialog.Content>
+                            <Text style={styles.meta}>
+                                This will remove the batch and adjust product
+                                stock.
+                            </Text>
+                        </Dialog.Content>
+                        <Dialog.Actions>
+                            <Button
+                                mode="text"
+                                onPress={() => setBatchDeleteOpen(false)}
+                                disabled={batchDeleting}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                mode="contained"
+                                buttonColor={theme.colors.error}
+                                onPress={handleDeleteBatch}
+                                loading={batchDeleting}
+                                disabled={batchDeleting}
+                            >
+                                Delete
                             </Button>
                         </Dialog.Actions>
                     </Dialog>
@@ -570,7 +691,9 @@ const ProductDetails = () => {
                             <Button
                                 mode="contained"
                                 style={{ flex: 1 }}
-                                onPress={() => setSheet(null)}
+                                onPress={handleSaveSheet}
+                                loading={saving}
+                                disabled={saving}
                             >
                                 Save
                             </Button>
@@ -718,6 +841,11 @@ const styles = StyleSheet.create({
         justifyContent: "space-between",
         alignItems: "center",
         marginBottom: 4,
+    },
+    batchActions: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
     },
     emptyBatch: {
         paddingVertical: 8,

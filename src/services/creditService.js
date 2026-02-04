@@ -39,7 +39,6 @@ const payTowardSaleItems = async (customer, items, paidAt = Date.now()) => {
             p.customer.set(customer);
             p.totalAmount = totalAmount;
             p.paidAt = paidAt;
-            p.createdAt = Date.now();
             p.updatedAt = Date.now();
         });
 
@@ -57,7 +56,6 @@ const payTowardSaleItems = async (customer, items, paidAt = Date.now()) => {
                 cpi.creditPayment.set(payment);
                 cpi.saleItem.set(saleItem);
                 cpi.amountApplied = amount;
-                cpi.createdAt = Date.now();
                 cpi.updatedAt = Date.now();
             });
         }

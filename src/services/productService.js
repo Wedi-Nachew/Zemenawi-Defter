@@ -6,6 +6,16 @@ const productCollection = database.collections.get("products");
 // Create a new product - NO stock, NO batches
 const createProduct = async (productData) => {
     return await database.write(async () => {
+        const existing = await productCollection.query().fetch();
+        const normalized = productData.name.trim().toLowerCase();
+        const duplicate = existing.find(
+            (p) => p.name?.trim().toLowerCase() === normalized,
+        );
+
+        if (duplicate) {
+            throw new Error("Product name already exists.");
+        }
+
         return productCollection.create((product) => {
             product.name = productData.name;
             if (productData.defaultSellingPrice <= 0) {
@@ -16,7 +26,6 @@ const createProduct = async (productData) => {
             product.defaultSellingPrice = productData.defaultSellingPrice;
             product.stock = 0; // initial stock is zero
             product.unit = productData.unit;
-            product.createdAt = Date.now();
             product.updatedAt = Date.now();
         });
     });

@@ -1,10 +1,5 @@
 import { Model } from "@nozbe/watermelondb";
-import {
-    date,
-    field,
-    readonly,
-    relation,
-} from "@nozbe/watermelondb/decorators";
+import { date, field, relation } from "@nozbe/watermelondb/decorators";
 
 class ProductBatch extends Model {
     static table = "product_batches";
@@ -21,7 +16,7 @@ class ProductBatch extends Model {
     @field("quantity") quantity;
     @field("remaining_quantity") remainingQuantity;
     @date("purchased_at") purchasedAt;
-    @readonly @date("created_at") createdAt;
+    @date("created_at") createdAt;
     @date("updated_at") updatedAt;
 }
 

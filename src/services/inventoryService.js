@@ -24,7 +24,6 @@ const addStock = async (
             batch.quantity = quantity;
             batch.remainingQuantity = quantity;
             batch.purchasedAt = purchasedAt;
-            batch.createdAt = Date.now();
             batch.updatedAt = Date.now();
         });
 
@@ -85,4 +84,64 @@ const consumeStockFIFO = async (product, quantityNeeded) => {
     return totalCost;
 };
 
-export { addStock, consumeStockFIFO };
+const updateBatch = async (
+    batch,
+    { purchasePrice, remainingQuantity, purchasedAt } = {},
+) => {
+    return database.write(async () => {
+        const currentRemaining = batch.remainingQuantity || 0;
+        const nextRemaining =
+            remainingQuantity !== undefined
+                ? Number(remainingQuantity)
+                : currentRemaining;
+
+        const diff = nextRemaining - currentRemaining;
+        const product = await batch.product.fetch();
+
+        if (product.stock + diff < 0) {
+            throw new Error("Resulting stock cannot be negative.");
+        }
+
+        await batch.update((b) => {
+            if (purchasePrice !== undefined) {
+                b.purchasePrice = Number(purchasePrice);
+            }
+            if (remainingQuantity !== undefined) {
+                b.remainingQuantity = Number(remainingQuantity);
+            }
+            if (purchasedAt !== undefined) {
+                b.purchasedAt = purchasedAt;
+            }
+            b.updatedAt = Date.now();
+        });
+
+        if (diff !== 0) {
+            await product.update((p) => {
+                p.stock += diff;
+                p.updatedAt = Date.now();
+            });
+        }
+
+        return batch;
+    });
+};
+
+const deleteBatch = async (batch) => {
+    return database.write(async () => {
+        const product = await batch.product.fetch();
+        const remaining = batch.remainingQuantity || 0;
+
+        if (product.stock - remaining < 0) {
+            throw new Error("Cannot delete batch: stock mismatch.");
+        }
+
+        await product.update((p) => {
+            p.stock -= remaining;
+            p.updatedAt = Date.now();
+        });
+
+        await batch.markAsDeleted();
+    });
+};
+
+export { addStock, consumeStockFIFO, deleteBatch, updateBatch };
