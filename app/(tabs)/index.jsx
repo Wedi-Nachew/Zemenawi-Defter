@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Button, Text } from "react-native-paper";
@@ -19,12 +20,14 @@ const HomeScreen = () => {
                 icon: "cart-check",
                 mode: "contained",
                 color: theme.colors.primary,
+                routeTo: "(tabs)/sales/new",
             },
             {
                 label: "Add Product",
                 icon: "plus-circle",
                 mode: "outlined",
                 color: theme.colors.primary,
+                routeTo: "(tabs)/inventory/new",
             },
         ],
         [],
@@ -148,14 +151,23 @@ const HomeScreen = () => {
                         ]}
                         contentStyle={styles.actionContent}
                         labelStyle={styles.actionLabel}
-                        onPress={() => {}}
+                        onPress={() => router.push(action.routeTo)}
                     >
                         {action.label}
                     </Button>
                 ))}
             </View>
 
-            <LowStockAlert items={lowStockItems} />
+            {lowStockItems.length > 0 ? (
+                <LowStockAlert items={lowStockItems} />
+            ) : (
+                <View style={styles.emptyCard}>
+                    <Text style={styles.emptyTitle}>No low stock items</Text>
+                    <Text style={styles.emptySubtitle}>
+                        All products are above the low stock threshold.
+                    </Text>
+                </View>
+            )}
 
             <View>
                 <View style={styles.header}>
@@ -164,16 +176,25 @@ const HomeScreen = () => {
                     </View>
                     <Button
                         mode="text"
-                        onPress={() => {}}
+                        onPress={() => router.push("(tabs)/sales")}
                         labelStyle={styles.seeAllLabel}
                         compact
                     >
                         See All
                     </Button>
                 </View>
-                {recentSales.map((sale) => (
-                    <RecentSaleItem key={sale.id} {...sale} />
-                ))}
+                {recentSales.length === 0 ? (
+                    <View style={styles.emptyCard}>
+                        <Text style={styles.emptyTitle}>No recent sales</Text>
+                        <Text style={styles.emptySubtitle}>
+                            Sales will appear here once recorded.
+                        </Text>
+                    </View>
+                ) : (
+                    recentSales.map((sale) => (
+                        <RecentSaleItem key={sale.id} {...sale} />
+                    ))
+                )}
             </View>
         </ScrollScreen>
     );
@@ -247,6 +268,23 @@ const styles = StyleSheet.create({
     seeAllLabel: {
         fontSize: 14,
         color: "#2563EB",
+    },
+    emptyCard: {
+        backgroundColor: theme.colors.surface,
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: "#EEF0F4",
+    },
+    emptyTitle: {
+        color: theme.colors.text,
+        fontWeight: "700",
+        fontSize: 14,
+    },
+    emptySubtitle: {
+        color: theme.colors.onSurface,
+        marginTop: 4,
+        fontSize: 12,
     },
 });
 

@@ -1,5 +1,6 @@
 import { StyleSheet, View } from "react-native";
 
+import { router } from "expo-router";
 import { Button, Card, Divider, Icon, Text } from "react-native-paper";
 import theme from "../theme";
 
@@ -19,7 +20,7 @@ const LowStockAlert = ({ items }) => {
                 </View>
                 <Button
                     mode="text"
-                    onPress={() => {}}
+                    onPress={() => router.push("(tabs)/inventory")}
                     labelStyle={styles.viewInventoryLabel}
                     compact
                 >
