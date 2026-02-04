@@ -1,6 +1,6 @@
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { Button, Card, Chip, Icon, IconButton, Text } from "react-native-paper";
 import InitialAvatar from "../../../src/components/InitialAvatar";
 import Screen from "../../../src/components/Screen";
@@ -127,156 +127,167 @@ const CreditDetailsScreen = () => {
     }
 
     return (
-        <Screen contentContainerStyle={styles.container}>
-            <View style={styles.headerRow}>
-                <IconButton icon="arrow-left" onPress={() => router.back()} />
-                <Text variant="titleMedium" style={styles.title}>
-                    {customer.name}
-                </Text>
-                <IconButton icon="dots-horizontal" onPress={() => {}} />
-            </View>
-
-            <View style={styles.profileCard}>
-                <InitialAvatar name={customer.name} size={72} />
-                <Text style={styles.profileName}>{customer.name}</Text>
-                <Text style={styles.meta}>Total Outstanding Balance</Text>
-                <Text style={styles.balanceValue}>
-                    ETB {customer.balance.toLocaleString()}
-                </Text>
-                <View style={styles.profileMetaRow}>
-                    <Icon
-                        source="phone"
-                        size={14}
-                        color={theme.colors.primary}
-                    />
-                    <Text style={styles.meta}>{customer.phone}</Text>
+        <>
+            <Stack.Screen
+                options={{
+                    headerTitle: customer.name,
+                    headerTitleStyle: {
+                        fontWeight: "700",
+                        fontSize: 20,
+                    },
+                    headerTitleAlign: "center",
+                }}
+            />
+            <Screen contentContainerStyle={styles.container}>
+                <View style={styles.profileCard}>
+                    <InitialAvatar name={customer.name} size={72} />
+                    <Text style={styles.profileName}>{customer.name}</Text>
+                    <Text style={styles.meta}>Total Outstanding Balance</Text>
+                    <Text style={styles.balanceValue}>
+                        ETB {customer.balance.toLocaleString()}
+                    </Text>
+                    <View style={styles.profileMetaRow}>
+                        <Icon
+                            source="phone"
+                            size={14}
+                            color={theme.colors.primary}
+                        />
+                        <Text style={styles.meta}>{customer.phone}</Text>
+                    </View>
                 </View>
-            </View>
 
-            <View style={styles.tabRow}>
-                <Chip
-                    selected={tab === "unpaid"}
-                    onPress={() => setTab("unpaid")}
-                    mode={tab === "unpaid" ? "flat" : "outlined"}
-                    selectedColor="#FFFFFF"
-                    style={[
-                        styles.tabChip,
-                        tab === "unpaid" && styles.tabChipActive,
-                    ]}
-                    textStyle={{
-                        color: tab === "unpaid" ? "#FFFFFF" : theme.colors.text,
-                    }}
-                >
-                    Unpaid Items
-                </Chip>
-                <Chip
-                    selected={tab === "payments"}
-                    onPress={() => setTab("payments")}
-                    mode={tab === "payments" ? "flat" : "outlined"}
-                    selectedColor="#FFFFFF"
-                    style={[
-                        styles.tabChip,
-                        tab === "payments" && styles.tabChipActive,
-                    ]}
-                    textStyle={{
-                        color:
-                            tab === "payments" ? "#FFFFFF" : theme.colors.text,
-                    }}
-                >
-                    Payment History
-                </Chip>
-            </View>
+                <View style={styles.tabRow}>
+                    <Chip
+                        selected={tab === "unpaid"}
+                        onPress={() => setTab("unpaid")}
+                        mode={tab === "unpaid" ? "flat" : "outlined"}
+                        selectedColor="#FFFFFF"
+                        style={[
+                            styles.tabChip,
+                            tab === "unpaid" && styles.tabChipActive,
+                        ]}
+                        textStyle={{
+                            color:
+                                tab === "unpaid"
+                                    ? "#FFFFFF"
+                                    : theme.colors.text,
+                        }}
+                    >
+                        Unpaid Items
+                    </Chip>
+                    <Chip
+                        selected={tab === "payments"}
+                        onPress={() => setTab("payments")}
+                        mode={tab === "payments" ? "flat" : "outlined"}
+                        selectedColor="#FFFFFF"
+                        style={[
+                            styles.tabChip,
+                            tab === "payments" && styles.tabChipActive,
+                        ]}
+                        textStyle={{
+                            color:
+                                tab === "payments"
+                                    ? "#FFFFFF"
+                                    : theme.colors.text,
+                        }}
+                    >
+                        Payment History
+                    </Chip>
+                </View>
 
-            {tab === "unpaid" && (
-                <View style={{ gap: 12 }}>
-                    {customer.unpaidItems.length === 0 && (
-                        <Card style={styles.card}>
-                            <Card.Content>
-                                <Text style={styles.meta}>
-                                    No unpaid items.
-                                </Text>
-                            </Card.Content>
-                        </Card>
-                    )}
-                    {customer.unpaidItems.map((item) => (
-                        <Card key={item.id} style={styles.card}>
-                            <Card.Content style={styles.itemRow}>
-                                <View style={styles.itemIcon}>
-                                    <Icon
-                                        source="cube-outline"
-                                        size={18}
-                                        color={theme.colors.primary}
-                                    />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.itemTitle}>
-                                        {item.title}
-                                    </Text>
+                {tab === "unpaid" && (
+                    <ScrollView contentContainerStyle={{ gap: 12 }}>
+                        {customer.unpaidItems.length === 0 && (
+                            <Card style={styles.card}>
+                                <Card.Content>
                                     <Text style={styles.meta}>
-                                        Qty {item.qty} • {item.date}
+                                        No unpaid items.
                                     </Text>
-                                </View>
-                                <Text style={styles.itemAmount}>
-                                    ETB {item.amount.toLocaleString()}
-                                </Text>
-                            </Card.Content>
-                        </Card>
-                    ))}
-                </View>
-            )}
+                                </Card.Content>
+                            </Card>
+                        )}
+                        {customer.unpaidItems.map((item) => (
+                            <Card key={item.id} style={styles.card}>
+                                <Card.Content style={styles.itemRow}>
+                                    <View style={styles.itemIcon}>
+                                        <Icon
+                                            source="cube-outline"
+                                            size={18}
+                                            color={theme.colors.primary}
+                                        />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.itemTitle}>
+                                            {item.title}
+                                        </Text>
+                                        <Text style={styles.meta}>
+                                            Qty {item.qty} • {item.date}
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.itemAmount}>
+                                        ETB {item.amount.toLocaleString()}
+                                    </Text>
+                                </Card.Content>
+                            </Card>
+                        ))}
+                    </ScrollView>
+                )}
 
-            {tab === "payments" && (
-                <View style={{ gap: 12 }}>
-                    {customer.payments.length === 0 && (
-                        <Card style={styles.card}>
-                            <Card.Content>
-                                <Text style={styles.meta}>
-                                    No payments recorded.
-                                </Text>
-                            </Card.Content>
-                        </Card>
-                    )}
-                    {customer.payments.map((payment) => (
-                        <Card key={payment.id} style={styles.card}>
-                            <Card.Content style={styles.paymentRow}>
-                                <View style={styles.itemIcon}>
-                                    <Icon
-                                        source="cash"
-                                        size={18}
-                                        color={theme.colors.secondary}
-                                    />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.itemTitle}>
-                                        Payment received
-                                    </Text>
+                {tab === "payments" && (
+                    <ScrollView contentContainerStyle={{ gap: 12 }}>
+                        {customer.payments.length === 0 && (
+                            <Card style={styles.card}>
+                                <Card.Content>
                                     <Text style={styles.meta}>
-                                        {payment.date}
+                                        No payments recorded.
                                     </Text>
-                                </View>
-                                <Text style={styles.itemAmount}>
-                                    ETB {payment.amount.toLocaleString()}
-                                </Text>
-                            </Card.Content>
-                        </Card>
-                    ))}
-                </View>
-            )}
+                                </Card.Content>
+                            </Card>
+                        )}
+                        {customer.payments.map((payment) => (
+                            <Card key={payment.id} style={styles.card}>
+                                <Card.Content style={styles.paymentRow}>
+                                    <View style={styles.itemIcon}>
+                                        <Icon
+                                            source="cash"
+                                            size={18}
+                                            color={theme.colors.secondary}
+                                        />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.itemTitle}>
+                                            Payment received
+                                        </Text>
+                                        <Text style={styles.meta}>
+                                            {payment.date}
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.itemAmount}>
+                                        ETB {payment.amount.toLocaleString()}
+                                    </Text>
+                                </Card.Content>
+                            </Card>
+                        ))}
+                    </ScrollView>
+                )}
 
-            <Button
-                mode="contained"
-                icon="wallet"
-                style={styles.actionButton}
-                onPress={() =>
-                    router.push({
-                        pathname: "/(tabs)/credits/payment",
-                        params: { id: customer.id },
-                    })
-                }
-            >
-                Receive Payment
-            </Button>
-        </Screen>
+                <View style={styles.actionButtonContainer}>
+                    <Button
+                        mode="contained"
+                        icon="wallet"
+                        style={styles.actionButton}
+                        onPress={() =>
+                            router.push({
+                                pathname: "/(tabs)/credits/payment",
+                                params: { id: customer.id },
+                            })
+                        }
+                    >
+                        Receive Payment
+                    </Button>
+                </View>
+            </Screen>
+        </>
     );
 };
 
@@ -285,11 +296,7 @@ const styles = StyleSheet.create({
         gap: 16,
         paddingBottom: 32,
     },
-    headerRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-    },
+
     title: {
         color: theme.colors.text,
         fontWeight: "700",
@@ -326,6 +333,7 @@ const styles = StyleSheet.create({
     tabRow: {
         flexDirection: "row",
         gap: 8,
+        marginVertical: 16,
     },
     tabChip: {
         borderRadius: 999,
@@ -366,6 +374,9 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         gap: 12,
+    },
+    actionButtonContainer: {
+        marginTop: 8,
     },
     actionButton: {
         borderRadius: 16,

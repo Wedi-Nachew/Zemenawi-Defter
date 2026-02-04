@@ -1,11 +1,14 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import {
     Button,
     Card,
     Chip,
+    Icon,
     IconButton,
+    Modal,
+    Portal,
     Text,
     TextInput,
 } from "react-native-paper";
@@ -64,6 +67,35 @@ const MakePaymentScreen = () => {
     const [amount, setAmount] = useState("2850");
     const [mode, setMode] = useState("auto");
     const [selected, setSelected] = useState(["i1", "i2"]);
+    const [showSuccess, setShowSuccess] = useState(false);
+
+    const receipt = useMemo(
+        () => `#ZD-${Math.floor(8000 + Math.random() * 999)}`,
+        [showSuccess],
+    );
+
+    // Always define invoices, parsedAmount, and autoSelected hooks before any early return
+    const invoices = useMemo(() => {
+        if (!customer) return [];
+        return customer.invoices.map((inv) => ({
+            ...inv,
+            invoiceNo: `Inv #${inv.id.replace("i", "10")}`,
+        }));
+    }, [customer]);
+
+    const parsedAmount = Number(String(amount).replace(/,/g, "")) || 0;
+
+    const autoSelected = useMemo(() => {
+        if (parsedAmount <= 0) return [];
+        let remaining = parsedAmount;
+        const ids = [];
+        for (const inv of invoices) {
+            if (remaining <= 0) break;
+            ids.push(inv.id);
+            remaining -= inv.amount;
+        }
+        return ids;
+    }, [invoices, parsedAmount]);
 
     if (!customer) {
         return (
@@ -87,22 +119,10 @@ const MakePaymentScreen = () => {
         );
     }
 
-    const invoices = customer.invoices.map((inv) => ({
-        ...inv,
-        selected: selected.includes(inv.id),
-        invoiceNo: `Inv #${inv.id.replace("i", "10")}`,
-    }));
+    const activeSelected = mode === "auto" ? autoSelected : selected;
 
     return (
-        <Screen contentContainerStyle={styles.container}>
-            <View style={styles.headerRow}>
-                <IconButton icon="arrow-left" onPress={() => router.back()} />
-                <Text variant="titleMedium" style={styles.title}>
-                    Make Payment
-                </Text>
-                <IconButton icon="close" onPress={() => router.back()} />
-            </View>
-
+        <Screen style={styles.container}>
             <View style={styles.amountBlock}>
                 <Text style={styles.label}>Amount to Pay</Text>
                 <TextInput
@@ -160,39 +180,56 @@ const MakePaymentScreen = () => {
                     style={styles.selectedChip}
                     textStyle={styles.selectedChipText}
                 >
-                    {selected.length} selected
+                    {activeSelected.length} selected
                 </Chip>
             </View>
 
             <Card style={styles.card}>
                 <Card.Content style={{ gap: 12 }}>
-                    {invoices.map((inv) => (
-                        <View
-                            key={inv.id}
-                            style={[
-                                styles.invoiceRow,
-                                inv.selected && styles.invoiceRowActive,
-                            ]}
-                        >
-                            <View style={styles.checkbox}>
+                    {invoices.map((inv) => {
+                        const isSelected = activeSelected.includes(inv.id);
+                        return (
+                            <Pressable
+                                key={inv.id}
+                                onPress={() => {
+                                    if (mode !== "select") return;
+                                    setSelected((prev) =>
+                                        prev.includes(inv.id)
+                                            ? prev.filter((id) => id !== inv.id)
+                                            : [...prev, inv.id],
+                                    );
+                                }}
+                            >
                                 <View
                                     style={[
-                                        styles.checkboxInner,
-                                        inv.selected && styles.checkboxSelected,
+                                        styles.invoiceRow,
+                                        isSelected && styles.invoiceRowActive,
                                     ]}
-                                />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.invoiceTitle}>
-                                    {inv.invoiceNo} - {inv.title}
-                                </Text>
-                                <Text style={styles.meta}>{inv.date}</Text>
-                            </View>
-                            <Text style={styles.invoiceAmount}>
-                                ETB {inv.amount.toLocaleString()}
-                            </Text>
-                        </View>
-                    ))}
+                                >
+                                    <View style={styles.checkbox}>
+                                        <View
+                                            style={[
+                                                styles.checkboxInner,
+                                                isSelected &&
+                                                    styles.checkboxSelected,
+                                            ]}
+                                        />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.invoiceTitle}>
+                                            {inv.invoiceNo} - {inv.title}
+                                        </Text>
+                                        <Text style={styles.meta}>
+                                            {inv.date}
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.invoiceAmount}>
+                                        ETB {inv.amount.toLocaleString()}
+                                    </Text>
+                                </View>
+                            </Pressable>
+                        );
+                    })}
                 </Card.Content>
             </Card>
 
@@ -206,15 +243,78 @@ const MakePaymentScreen = () => {
                 icon="arrow-right"
                 contentStyle={styles.confirmContent}
                 style={styles.confirmButton}
-                onPress={() =>
-                    router.push({
-                        pathname: "/(tabs)/credits/payment-success",
-                        params: { id: customer.id, amount },
-                    })
-                }
+                onPress={() => setShowSuccess(true)}
             >
                 Confirm Payment
             </Button>
+
+            <Portal>
+                <Modal
+                    visible={showSuccess}
+                    onDismiss={() => setShowSuccess(false)}
+                    contentContainerStyle={styles.successSheet}
+                >
+                    <View style={styles.sheetHandle} />
+                    <View style={styles.successHeader}>
+                        <View style={styles.checkWrap}>
+                            <Icon source="check" size={20} color="#FFFFFF" />
+                        </View>
+                        <View>
+                            <Text style={styles.successTitle}>
+                                Payment Successful
+                            </Text>
+                            <Text style={styles.successSubtitle}>
+                                Transaction completed successfully
+                            </Text>
+                        </View>
+                    </View>
+
+                    <Card style={styles.receiptCard}>
+                        <Card.Content style={{ gap: 12 }}>
+                            <View style={styles.amountBlock}>
+                                <Text style={styles.amountLabel}>
+                                    Amount Paid
+                                </Text>
+                                <Text style={styles.amountValue}>
+                                    ETB {parsedAmount.toLocaleString()}
+                                </Text>
+                            </View>
+                            <View style={styles.rowBetween}>
+                                <Text style={styles.meta}>Receipt No</Text>
+                                <Text style={styles.metaStrong}>{receipt}</Text>
+                            </View>
+                            <View style={styles.rowBetween}>
+                                <Text style={styles.meta}>Customer</Text>
+                                <Text style={styles.metaStrong}>
+                                    {customer?.name ?? "Customer"}
+                                </Text>
+                            </View>
+                            <View style={styles.rowBetween}>
+                                <Text style={styles.meta}>Date</Text>
+                                <Text style={styles.metaStrong}>
+                                    Feb 03, 2026 • 4:30 PM
+                                </Text>
+                            </View>
+                            <View style={styles.rowBetween}>
+                                <Text style={styles.meta}>
+                                    Remaining Balance
+                                </Text>
+                                <Text style={styles.metaStrong}>
+                                    ETB {customer?.balance?.toLocaleString()}
+                                </Text>
+                            </View>
+                        </Card.Content>
+                    </Card>
+
+                    <Button
+                        mode="contained"
+                        onPress={() => setShowSuccess(false)}
+                        style={styles.doneButton}
+                    >
+                        Done
+                    </Button>
+                </Modal>
+            </Portal>
         </Screen>
     );
 };
@@ -222,7 +322,6 @@ const MakePaymentScreen = () => {
 const styles = StyleSheet.create({
     container: {
         gap: 16,
-        paddingBottom: 32,
     },
     headerRow: {
         flexDirection: "row",
@@ -245,6 +344,7 @@ const styles = StyleSheet.create({
     },
     amountBlock: {
         gap: 8,
+        marginTop: 8,
     },
     amountInput: {
         backgroundColor: theme.colors.surface,
@@ -326,6 +426,7 @@ const styles = StyleSheet.create({
     },
     checkboxSelected: {
         backgroundColor: theme.colors.primary,
+        borderRadius: 50,
     },
     invoiceTitle: {
         color: theme.colors.text,
@@ -345,10 +446,78 @@ const styles = StyleSheet.create({
         fontWeight: "700",
     },
     confirmButton: {
+        marginTop: "auto",
         borderRadius: 16,
     },
     confirmContent: {
         paddingVertical: 6,
+    },
+    successSheet: {
+        backgroundColor: "#FFFFFF",
+        padding: 16,
+        borderTopLeftRadius: 22,
+        borderTopRightRadius: 22,
+        marginTop: "auto",
+        gap: 16,
+    },
+    sheetHandle: {
+        width: 48,
+        height: 5,
+        borderRadius: 999,
+        backgroundColor: "#E5E7EB",
+        alignSelf: "center",
+    },
+    successHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+    },
+    checkWrap: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: "#22C55E",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    successTitle: {
+        color: theme.colors.text,
+        fontWeight: "700",
+        fontSize: 16,
+    },
+    successSubtitle: {
+        color: theme.colors.onSurface,
+        fontSize: 12,
+    },
+    receiptCard: {
+        backgroundColor: theme.colors.surface,
+        borderRadius: 20,
+        elevation: 0,
+        borderWidth: 1,
+        borderColor: "#EEF0F4",
+    },
+    rowBetween: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+    },
+    amountLabel: {
+        color: theme.colors.onSurface,
+        fontSize: 11,
+        letterSpacing: 0.6,
+        textTransform: "uppercase",
+    },
+    amountValue: {
+        color: theme.colors.primary,
+        fontWeight: "700",
+        fontSize: 20,
+    },
+    metaStrong: {
+        color: theme.colors.text,
+        fontWeight: "600",
+    },
+    doneButton: {
+        borderRadius: 16,
     },
 });
 

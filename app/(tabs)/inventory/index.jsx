@@ -1,9 +1,10 @@
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import { useMemo, useState } from "react";
 import { FlatList, StyleSheet, View } from "react-native";
 import {
     Card,
     Chip,
+    Divider,
     Icon,
     IconButton,
     Searchbar,
@@ -41,6 +42,41 @@ const ProductsScreen = () => {
                 name: "Sunflower Oil",
                 unit: "liter",
                 price: 180,
+                stock: 0,
+            },
+            {
+                id: "p5",
+                name: "Sugar (50kg)",
+                unit: "bag",
+                price: 2800,
+                stock: 12,
+            },
+            {
+                id: "p6",
+                name: "Salt (25kg)",
+                unit: "bag",
+                price: 900,
+                stock: 0,
+            },
+            {
+                id: "p7",
+                name: "Eggs (30pcs)",
+                unit: "carton",
+                price: 220,
+                stock: 8,
+            },
+            {
+                id: "p8",
+                name: "Butter",
+                unit: "kg",
+                price: 450,
+                stock: 3,
+            },
+            {
+                id: "p9",
+                name: "Cheese",
+                unit: "kg",
+                price: 550,
                 stock: 0,
             },
         ],
@@ -121,72 +157,107 @@ const ProductsScreen = () => {
     };
 
     return (
-        <Screen contentContainerStyle={styles.container}>
-            <View style={styles.headerRow}>
-                <Text variant="headlineMedium" style={styles.title}>
-                    Products
-                </Text>
-                <IconButton
-                    icon="plus"
-                    mode="contained"
-                    containerColor={theme.colors.primary}
-                    iconColor="#FFFFFF"
-                    size={22}
-                    onPress={() => router.push("/(tabs)/inventory/add")}
+        <>
+            <Stack.Screen
+                options={{
+                    headerTitle: "Products",
+                    headerTitleStyle: {
+                        fontSize: 22,
+                        fontWeight: "700",
+                    },
+                    headerRight: () => (
+                        <IconButton
+                            icon="plus"
+                            mode="contained"
+                            containerColor={theme.colors.primary}
+                            iconColor="#FFFFFF"
+                            size={22}
+                            onPress={() => router.push("/(tabs)/inventory/new")}
+                        />
+                    ),
+                }}
+            />
+            <Screen style={styles.container}>
+                <Searchbar
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder="Search inventory..."
+                    style={styles.search}
+                    inputStyle={{ fontSize: 16 }}
+                    iconColor={theme.colors.primary}
                 />
-            </View>
 
-            <Searchbar
-                value={query}
-                onChangeText={setQuery}
-                placeholder="Search inventory..."
-                style={styles.search}
-                inputStyle={{ fontSize: 16 }}
-                iconColor={theme.colors.primary}
-            />
+                <View style={styles.filterRow}>
+                    <Chip
+                        selected={filter === "all"}
+                        onPress={() => setFilter("all")}
+                        mode={filter === "all" ? "flat" : "outlined"}
+                        selectedColor="#FFFFFF"
+                        textStyle={{
+                            color:
+                                filter === "all"
+                                    ? "#FFFFFF"
+                                    : theme.colors.text,
+                        }}
+                        style={[
+                            styles.filterChip,
+                            filter === "all" && styles.filterChipActive,
+                        ]}
+                    >
+                        All
+                    </Chip>
+                    <Chip
+                        selected={filter === "low"}
+                        onPress={() => setFilter("low")}
+                        mode={filter === "low" ? "flat" : "outlined"}
+                        selectedColor="#FFFFFF"
+                        textStyle={{
+                            color:
+                                filter === "low"
+                                    ? "#FFFFFF"
+                                    : theme.colors.text,
+                        }}
+                        style={[
+                            styles.filterChip,
+                            filter === "low" && styles.filterChipActive,
+                        ]}
+                    >
+                        Low Stock
+                    </Chip>
+                    <Chip
+                        selected={filter === "out"}
+                        onPress={() => setFilter("out")}
+                        mode={filter === "out" ? "flat" : "outlined"}
+                        selectedColor="#FFFFFF"
+                        textStyle={{
+                            color:
+                                filter === "out"
+                                    ? "#FFFFFF"
+                                    : theme.colors.text,
+                        }}
+                        style={[
+                            styles.filterChip,
+                            filter === "out" && styles.filterChipActive,
+                        ]}
+                    >
+                        Out of Stock
+                    </Chip>
+                </View>
 
-            <View style={styles.filterRow}>
-                <Chip
-                    selected={filter === "all"}
-                    onPress={() => setFilter("all")}
-                    mode={filter === "all" ? "flat" : "outlined"}
-                    selectedColor="#FFFFFF"
-                    textStyle={{
-                        color: filter === "all" ? "#FFFFFF" : theme.colors.text,
-                    }}
-                >
-                    All
-                </Chip>
-                <Chip
-                    selected={filter === "low"}
-                    onPress={() => setFilter("low")}
-                    mode={filter === "low" ? "flat" : "outlined"}
-                    selectedColor="#111827"
-                    textStyle={{ color: theme.colors.text }}
-                >
-                    Low Stock
-                </Chip>
-                <Chip
-                    selected={filter === "out"}
-                    onPress={() => setFilter("out")}
-                    mode={filter === "out" ? "flat" : "outlined"}
-                    selectedColor="#111827"
-                    textStyle={{ color: theme.colors.text }}
-                >
-                    Out of Stock
-                </Chip>
-                <Chip mode="outlined">Category</Chip>
-            </View>
+                <Divider style={styles.divider} />
 
-            <FlatList
-                data={filtered}
-                keyExtractor={(item) => item.id}
-                renderItem={renderItem}
-                ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-                contentContainerStyle={{ paddingBottom: 72 }}
-                showsVerticalScrollIndicator={false}
-            />
-        </Screen>
+                <FlatList
+                    data={filtered}
+                    keyExtractor={(item) => item.id}
+                    renderItem={renderItem}
+                    ItemSeparatorComponent={() => (
+                        <View style={{ height: 12 }} />
+                    )}
+                    contentContainerStyle={{ paddingBottom: 72 }}
+                    showsVerticalScrollIndicator={false}
+                />
+            </Screen>
+        </>
     );
 };
 
@@ -220,6 +291,7 @@ const styles = StyleSheet.create({
     container: {
         gap: 14,
         paddingBottom: 24,
+        paddingTop: 2,
     },
     headerRow: {
         flexDirection: "row",
@@ -235,13 +307,28 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     search: {
-        borderRadius: theme.roundness,
+        borderRadius: 24,
+        backgroundColor: theme.colors.surface,
+        elevation: 3,
+        borderWidth: 1,
+        borderColor: "#E2E8F0",
+        marginTop: 2,
     },
     filterRow: {
         flexDirection: "row",
         gap: 8,
         marginTop: 6,
-        marginBottom: 6,
+        // marginBottom: 2,
+        paddingBottom: 4,
+    },
+    divider: {
+        // marginVertical: 4,
+    },
+    filterChip: {
+        borderRadius: 999,
+    },
+    filterChipActive: {
+        backgroundColor: theme.colors.primary,
     },
     card: {
         backgroundColor: theme.colors.surface,

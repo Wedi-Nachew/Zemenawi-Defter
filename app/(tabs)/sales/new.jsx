@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { Stack } from "expo-router";
 import { useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import {
@@ -7,232 +7,680 @@ import {
     Chip,
     Icon,
     IconButton,
+    Modal,
+    Portal,
     Text,
     TextInput,
+    TouchableRipple,
 } from "react-native-paper";
-import Screen from "../../../src/components/Screen";
+import FormScreen from "../../../src/components/FormScreen";
 import theme from "../../../src/theme";
 
 const NewSaleScreen = () => {
     const [query, setQuery] = useState("");
     const [paymentMethod, setPaymentMethod] = useState("cash");
     const [paidAmount, setPaidAmount] = useState("3100");
+    const [cartItems, setCartItems] = useState([
+        { id: "c1", name: "Teff Flour (10kg)", price: 1200, qty: 1 },
+        { id: "c2", name: "Cooking Oil (5L)", price: 950, qty: 2 },
+    ]);
+    const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [customerModalVisible, setCustomerModalVisible] = useState(false);
+    const [customerQuery, setCustomerQuery] = useState("");
+    const [addCustomerVisible, setAddCustomerVisible] = useState(false);
+    const [newCustomerName, setNewCustomerName] = useState("");
+    const [newCustomerPhone, setNewCustomerPhone] = useState("");
+    const [addProductVisible, setAddProductVisible] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    const [addQty, setAddQty] = useState("1");
+    const [addPrice, setAddPrice] = useState("");
+    const [editItem, setEditItem] = useState(null);
+    const [editQty, setEditQty] = useState("1");
+    const [editPrice, setEditPrice] = useState("");
 
-    const cartItems = useMemo(
+    const [customers, setCustomers] = useState([
+        {
+            id: "cust1",
+            name: "Abebe Bikila",
+            phone: "+251 911 222 333",
+            balance: 4250,
+        },
+        {
+            id: "cust2",
+            name: "Mekdes Tadesse",
+            phone: "+251 912 334 455",
+            balance: 0,
+        },
+        {
+            id: "cust3",
+            name: "Samuel Tesfaye",
+            phone: "+251 900 556 677",
+            balance: 1280,
+        },
+    ]);
+
+    const products = useMemo(
         () => [
-            { id: "c1", name: "Teff Flour (10kg)", price: 1200, qty: 1 },
-            { id: "c2", name: "Cooking Oil (5L)", price: 950, qty: 2 },
+            { id: "p1", name: "Teff Flour (10kg)", price: 1200 },
+            { id: "p2", name: "Cooking Oil (5L)", price: 950 },
+            { id: "p3", name: "Sugar (5kg)", price: 820 },
+            { id: "p4", name: "Rice (10kg)", price: 1050 },
+            { id: "p5", name: "Laundry Soap (1kg)", price: 260 },
         ],
         [],
     );
 
+    const filteredProducts = useMemo(() => {
+        if (!query.trim()) {
+            return [];
+        }
+        const normalized = query.trim().toLowerCase();
+        return products.filter((product) =>
+            product.name.toLowerCase().includes(normalized),
+        );
+    }, [products, query]);
+
+    const filteredCustomers = useMemo(() => {
+        const normalized = customerQuery.trim().toLowerCase();
+        return customers.filter((customer) => {
+            if (!normalized) {
+                return true;
+            }
+            return (
+                customer.name.toLowerCase().includes(normalized) ||
+                customer.phone.includes(normalized)
+            );
+        });
+    }, [customerQuery, customers]);
+
     const totals = useMemo(() => {
         const total = cartItems.reduce(
-            (sum, item) => sum + item.price * item.qty,
+            (sum, item) => sum + Number(item.price) * Number(item.qty),
             0,
         );
         const items = cartItems.reduce((sum, item) => sum + item.qty, 0);
         return { total, items };
     }, [cartItems]);
 
+    const handleSelectProduct = (product) => {
+        setSelectedProduct(product);
+        setAddQty("1");
+        setAddPrice(String(product.price));
+    };
+
+    const handleAddToCart = () => {
+        if (!selectedProduct) {
+            return;
+        }
+        const qty = Math.max(1, Number(addQty) || 1);
+        const price = Math.max(0, Number(addPrice) || 0);
+        setCartItems((prev) => {
+            const existing = prev.find((row) => row.id === selectedProduct.id);
+            if (existing) {
+                return prev.map((row) =>
+                    row.id === selectedProduct.id
+                        ? { ...row, qty: row.qty + qty, price }
+                        : row,
+                );
+            }
+            return [
+                ...prev,
+                {
+                    id: selectedProduct.id,
+                    name: selectedProduct.name,
+                    price,
+                    qty,
+                },
+            ];
+        });
+        setSelectedProduct(null);
+        setAddQty("1");
+        setAddPrice("");
+    };
+
+    const handleEditItem = (item) => {
+        setEditItem(item);
+        setEditQty(String(item.qty));
+        setEditPrice(String(item.price));
+    };
+
+    const handleSaveEdit = () => {
+        if (!editItem) {
+            return;
+        }
+        const qty = Math.max(1, Number(editQty) || 1);
+        const price = Math.max(0, Number(editPrice) || 0);
+        setCartItems((prev) =>
+            prev.map((row) =>
+                row.id === editItem.id ? { ...row, qty, price } : row,
+            ),
+        );
+        setEditItem(null);
+        setEditQty("1");
+        setEditPrice("");
+    };
+
+    const handleSelectCustomer = (customer) => {
+        setSelectedCustomer(customer);
+        setCustomerModalVisible(false);
+    };
+
+    const handleAddCustomer = () => {
+        if (!newCustomerName.trim() || !newCustomerPhone.trim()) {
+            return;
+        }
+        const newCustomer = {
+            id: `cust-${Date.now()}`,
+            name: newCustomerName.trim(),
+            phone: newCustomerPhone.trim(),
+            balance: 0,
+        };
+        setCustomers((prev) => [newCustomer, ...prev]);
+        setSelectedCustomer(newCustomer);
+        setNewCustomerName("");
+        setNewCustomerPhone("");
+        setAddCustomerVisible(false);
+        setCustomerModalVisible(false);
+    };
+
     return (
-        <Screen contentContainerStyle={styles.container}>
-            <View style={styles.headerRow}>
-                <IconButton icon="arrow-left" onPress={() => router.back()} />
-                <Text variant="titleMedium" style={styles.headerTitle}>
-                    New Sale
-                </Text>
-                <IconButton
-                    icon="trash-can-outline"
-                    iconColor={theme.colors.error}
-                    onPress={() => {}}
-                />
-            </View>
+        <>
+            <Stack.Screen
+                options={{
+                    headerTitle: "New Sale",
+                    headerTitleAlign: "center",
+                    headerTitleStyle: {
+                        fontWeight: "700",
+                        fontSize: 20,
+                    },
+                }}
+            />
+            <FormScreen contentContainerStyle={styles.container}>
+                <Button
+                    mode="outlined"
+                    icon="plus"
+                    onPress={() => setAddProductVisible(true)}
+                    style={styles.addProductButton}
+                >
+                    Add Product
+                </Button>
 
-            <SearchBar value={query} onChangeText={setQuery} />
-
-            <View style={styles.sectionHeader}>
-                <Text style={styles.sectionLabel}>Cart Items</Text>
-                <Text style={styles.sectionMeta}>
-                    {cartItems.length} Products
-                </Text>
-            </View>
-
-            <Card style={styles.card}>
-                <Card.Content style={{ gap: 12 }}>
-                    {cartItems.map((item) => (
-                        <View key={item.id} style={styles.cartRow}>
-                            <View style={styles.itemIconWrap}>
-                                <Icon
-                                    source="cube-outline"
-                                    size={18}
-                                    color={theme.colors.primary}
-                                />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.itemName}>{item.name}</Text>
-                                <Text style={styles.itemMeta}>
-                                    {item.price.toLocaleString()} ETB
-                                </Text>
-                            </View>
-                            <View style={styles.qtyWrap}>
-                                <IconButton
-                                    icon="minus"
-                                    size={16}
-                                    onPress={() => {}}
-                                />
-                                <Text style={styles.qtyValue}>{item.qty}</Text>
-                                <IconButton
-                                    icon="plus"
-                                    size={16}
-                                    onPress={() => {}}
-                                />
-                            </View>
+                <Portal>
+                    <Modal
+                        visible={addProductVisible}
+                        onDismiss={() => setAddProductVisible(false)}
+                        style={styles.modalBottom}
+                        contentContainerStyle={styles.modalContainer}
+                    >
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Add Products</Text>
                             <IconButton
-                                icon="trash-can-outline"
-                                size={18}
-                                onPress={() => {}}
+                                icon="close"
+                                size={20}
+                                onPress={() => setAddProductVisible(false)}
                             />
                         </View>
-                    ))}
-                </Card.Content>
-            </Card>
-
-            <View style={styles.sectionHeader}>
-                <Text style={styles.sectionLabel}>Customer</Text>
-            </View>
-            <Card style={styles.card}>
-                <Card.Content style={{ gap: 12 }}>
-                    <View style={styles.customerRow}>
-                        <View>
-                            <Text style={styles.itemName}>Abebe Bikila</Text>
+                        <SearchBar
+                            value={query}
+                            onChangeText={setQuery}
+                            autoFocus
+                        />
+                        <View style={styles.modalList}>
+                            {filteredProducts.length === 0 ? (
+                                <Text style={styles.modalEmpty}>
+                                    No matches
+                                </Text>
+                            ) : (
+                                filteredProducts.map((product) => (
+                                    <TouchableRipple
+                                        key={product.id}
+                                        onPress={() =>
+                                            handleSelectProduct(product)
+                                        }
+                                        borderless
+                                        style={styles.suggestionRow}
+                                    >
+                                        <View style={styles.modalItemRow}>
+                                            <Text style={styles.suggestionText}>
+                                                {product.name}
+                                            </Text>
+                                            <Text style={styles.modalPrice}>
+                                                {product.price.toLocaleString()}{" "}
+                                                ETB
+                                            </Text>
+                                        </View>
+                                    </TouchableRipple>
+                                ))
+                            )}
                         </View>
-                        <Icon
-                            source="chevron-down"
-                            size={20}
-                            color={theme.colors.onSurface}
-                        />
-                    </View>
-                    <View style={styles.alertPill}>
-                        <Icon
-                            source="alert"
-                            size={16}
-                            color={theme.colors.warning}
-                        />
-                        <Text style={styles.alertText}>
-                            Outstanding Balance: 4,250 ETB
-                        </Text>
-                    </View>
-                </Card.Content>
-            </Card>
+                        {selectedProduct && (
+                            <View style={styles.modalEditor}>
+                                <Text style={styles.modalSectionTitle}>
+                                    Selected: {selectedProduct.name}
+                                </Text>
+                                <View style={styles.modalFieldRow}>
+                                    <TextInput
+                                        mode="outlined"
+                                        label="Quantity"
+                                        value={addQty}
+                                        onChangeText={(text) =>
+                                            setAddQty(text.replace(/\D/g, ""))
+                                        }
+                                        keyboardType="numeric"
+                                        style={styles.modalField}
+                                    />
+                                    <TextInput
+                                        mode="outlined"
+                                        label="Selling Price"
+                                        value={addPrice}
+                                        onChangeText={(text) =>
+                                            setAddPrice(
+                                                text.replace(/[^\d.]/g, ""),
+                                            )
+                                        }
+                                        keyboardType="numeric"
+                                        style={styles.modalField}
+                                        right={<TextInput.Affix text="ETB" />}
+                                    />
+                                </View>
+                                <Button
+                                    mode="contained"
+                                    onPress={handleAddToCart}
+                                >
+                                    Add to Cart
+                                </Button>
+                            </View>
+                        )}
+                    </Modal>
+                    <Modal
+                        visible={Boolean(editItem)}
+                        onDismiss={() => setEditItem(null)}
+                        style={styles.modalBottom}
+                        contentContainerStyle={styles.modalContainer}
+                    >
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Edit Item</Text>
+                            <IconButton
+                                icon="close"
+                                size={20}
+                                onPress={() => setEditItem(null)}
+                            />
+                        </View>
+                        {editItem && (
+                            <View style={styles.modalEditor}>
+                                <Text style={styles.modalSectionTitle}>
+                                    {editItem.name}
+                                </Text>
+                                <View style={styles.modalFieldRow}>
+                                    <TextInput
+                                        mode="outlined"
+                                        label="Quantity"
+                                        value={editQty}
+                                        onChangeText={(text) =>
+                                            setEditQty(text.replace(/\D/g, ""))
+                                        }
+                                        keyboardType="numeric"
+                                        style={styles.modalField}
+                                    />
+                                    <TextInput
+                                        mode="outlined"
+                                        label="Selling Price"
+                                        value={editPrice}
+                                        onChangeText={(text) =>
+                                            setEditPrice(
+                                                text.replace(/[^\d.]/g, ""),
+                                            )
+                                        }
+                                        keyboardType="numeric"
+                                        style={styles.modalField}
+                                        right={<TextInput.Affix text="ETB" />}
+                                    />
+                                </View>
+                                <Button
+                                    mode="contained"
+                                    onPress={handleSaveEdit}
+                                >
+                                    Save Changes
+                                </Button>
+                            </View>
+                        )}
+                    </Modal>
+                </Portal>
 
-            <View style={styles.sectionHeader}>
-                <Text style={styles.sectionLabel}>Payment Method</Text>
-            </View>
-            <Card style={styles.card}>
-                <Card.Content style={{ gap: 12 }}>
-                    <View style={styles.paymentRow}>
-                        <Chip
-                            icon="cash"
-                            selected={paymentMethod === "cash"}
-                            onPress={() => setPaymentMethod("cash")}
-                            mode={
-                                paymentMethod === "cash" ? "flat" : "outlined"
-                            }
-                            selectedColor="#FFFFFF"
-                            style={[
-                                styles.methodChip,
-                                paymentMethod === "cash" &&
-                                    styles.methodChipActive,
-                            ]}
-                            textStyle={{
-                                color:
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionLabel}>Cart Items</Text>
+                    <Text style={styles.sectionMeta}>
+                        {cartItems.length} Products
+                    </Text>
+                </View>
+
+                <Card style={styles.card}>
+                    <Card.Content style={{ gap: 12 }}>
+                        {cartItems.map((item) => (
+                            <View key={item.id} style={styles.cartRow}>
+                                <View style={styles.itemIconWrap}>
+                                    <Icon
+                                        source="cube-outline"
+                                        size={18}
+                                        color={theme.colors.primary}
+                                    />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.itemName}>
+                                        {item.name}
+                                    </Text>
+                                    <Text style={styles.itemMeta}>
+                                        {item.price.toLocaleString()} ETB
+                                    </Text>
+                                </View>
+                                <View style={styles.qtyPill}>
+                                    <Text style={styles.qtyPillText}>
+                                        {item.qty} Units
+                                    </Text>
+                                </View>
+                                <IconButton
+                                    icon="pencil-outline"
+                                    size={18}
+                                    onPress={() => handleEditItem(item)}
+                                />
+                                <IconButton
+                                    icon="trash-can-outline"
+                                    size={18}
+                                    onPress={() =>
+                                        setCartItems((prev) =>
+                                            prev.filter(
+                                                (row) => row.id !== item.id,
+                                            ),
+                                        )
+                                    }
+                                />
+                            </View>
+                        ))}
+                    </Card.Content>
+                </Card>
+
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionLabel}>Customer</Text>
+                    <Button
+                        mode="text"
+                        onPress={() => setCustomerModalVisible(true)}
+                        labelStyle={styles.linkButton}
+                        compact
+                    >
+                        Select
+                    </Button>
+                </View>
+                <Card style={styles.card}>
+                    <Card.Content style={{ gap: 12 }}>
+                        <View style={styles.customerRow}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.itemName}>
+                                    {selectedCustomer?.name ??
+                                        "Select customer"}
+                                </Text>
+                                <Text style={styles.itemMeta}>
+                                    {selectedCustomer?.phone ??
+                                        "Customer phone"}
+                                </Text>
+                            </View>
+                            <Icon
+                                source="account-search-outline"
+                                size={20}
+                                color={theme.colors.onSurface}
+                            />
+                        </View>
+                        {paymentMethod === "credit" && !selectedCustomer && (
+                            <View style={styles.alertPill}>
+                                <Icon
+                                    source="alert"
+                                    size={16}
+                                    color={theme.colors.warning}
+                                />
+                                <Text style={styles.alertText}>
+                                    Customer is required for credit sales.
+                                </Text>
+                            </View>
+                        )}
+                        {selectedCustomer?.balance > 0 && (
+                            <View style={styles.alertPill}>
+                                <Icon
+                                    source="alert"
+                                    size={16}
+                                    color={theme.colors.warning}
+                                />
+                                <Text style={styles.alertText}>
+                                    Outstanding Balance:{" "}
+                                    {selectedCustomer.balance.toLocaleString()}{" "}
+                                    ETB
+                                </Text>
+                            </View>
+                        )}
+                    </Card.Content>
+                </Card>
+
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionLabel}>Payment Method</Text>
+                </View>
+                <Card style={styles.card}>
+                    <Card.Content style={{ gap: 12 }}>
+                        <View style={styles.paymentRow}>
+                            <Chip
+                                icon="cash"
+                                selected={paymentMethod === "cash"}
+                                onPress={() => setPaymentMethod("cash")}
+                                mode={
                                     paymentMethod === "cash"
-                                        ? "#FFFFFF"
-                                        : theme.colors.text,
-                            }}
-                        >
-                            Cash
-                        </Chip>
-                        <Chip
-                            icon="credit-card"
-                            selected={paymentMethod === "credit"}
-                            onPress={() => setPaymentMethod("credit")}
-                            mode={
-                                paymentMethod === "credit" ? "flat" : "outlined"
-                            }
-                            selectedColor="#FFFFFF"
-                            style={[
-                                styles.methodChip,
-                                paymentMethod === "credit" &&
-                                    styles.methodChipActive,
-                            ]}
-                            textStyle={{
-                                color:
+                                        ? "flat"
+                                        : "outlined"
+                                }
+                                selectedColor="#FFFFFF"
+                                style={[
+                                    styles.methodChip,
+                                    paymentMethod === "cash" &&
+                                        styles.methodChipActive,
+                                ]}
+                                textStyle={{
+                                    color:
+                                        paymentMethod === "cash"
+                                            ? "#FFFFFF"
+                                            : theme.colors.text,
+                                }}
+                            >
+                                Cash
+                            </Chip>
+                            <Chip
+                                icon="credit-card"
+                                selected={paymentMethod === "credit"}
+                                onPress={() => setPaymentMethod("credit")}
+                                mode={
                                     paymentMethod === "credit"
-                                        ? "#FFFFFF"
-                                        : theme.colors.text,
-                            }}
-                        >
-                            Credit
-                        </Chip>
-                    </View>
+                                        ? "flat"
+                                        : "outlined"
+                                }
+                                selectedColor="#FFFFFF"
+                                style={[
+                                    styles.methodChip,
+                                    paymentMethod === "credit" &&
+                                        styles.methodChipActive,
+                                ]}
+                                textStyle={{
+                                    color:
+                                        paymentMethod === "credit"
+                                            ? "#FFFFFF"
+                                            : theme.colors.text,
+                                }}
+                            >
+                                Credit
+                            </Chip>
+                        </View>
 
-                    <View>
-                        <Text style={styles.sectionLabel}>
-                            Paid Amount (ETB)
-                        </Text>
-                        <TextInput
-                            mode="outlined"
-                            value={paidAmount}
-                            onChangeText={setPaidAmount}
-                            keyboardType="numeric"
-                            outlineColor="#E5E7EB"
-                            activeOutlineColor={theme.colors.primary}
-                            style={styles.input}
-                            right={<TextInput.Affix text="ETB" />}
+                        <View>
+                            <Text style={styles.sectionLabel}>
+                                Paid Amount (ETB)
+                            </Text>
+                            <TextInput
+                                mode="outlined"
+                                value={paidAmount}
+                                onChangeText={setPaidAmount}
+                                keyboardType="numeric"
+                                outlineColor="#E5E7EB"
+                                activeOutlineColor={theme.colors.primary}
+                                style={styles.input}
+                                right={<TextInput.Affix text="ETB" />}
+                            />
+                            <Text style={styles.helperText}>
+                                Subtotal: 3,100.00 ETB
+                            </Text>
+                        </View>
+                    </Card.Content>
+                </Card>
+
+                <Card style={styles.summaryCard}>
+                    <Card.Content style={styles.summaryRow}>
+                        <View>
+                            <Text style={styles.sectionLabel}>
+                                Total Payable
+                            </Text>
+                            <Text style={styles.totalValue}>
+                                {totals.total.toLocaleString()} ETB
+                            </Text>
+                        </View>
+                        <View style={{ alignItems: "flex-end" }}>
+                            <Text style={styles.sectionLabel}>Items Count</Text>
+                            <Text style={styles.itemsValue}>
+                                {totals.items} Units
+                            </Text>
+                        </View>
+                    </Card.Content>
+                </Card>
+            </FormScreen>
+            <View style={styles.footer}>
+                <Button
+                    mode="contained"
+                    icon="check"
+                    style={styles.submitButton}
+                    onPress={() => {}}
+                >
+                    Complete Sale
+                </Button>
+            </View>
+
+            <Portal>
+                <Modal
+                    visible={customerModalVisible}
+                    onDismiss={() => setCustomerModalVisible(false)}
+                    style={styles.modalBottom}
+                    contentContainerStyle={styles.modalContainer}
+                >
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Select Customer</Text>
+                        <IconButton
+                            icon="close"
+                            size={20}
+                            onPress={() => setCustomerModalVisible(false)}
                         />
-                        <Text style={styles.helperText}>
-                            Subtotal: 3,100.00 ETB
-                        </Text>
                     </View>
-                </Card.Content>
-            </Card>
-
-            <Card style={styles.summaryCard}>
-                <Card.Content style={styles.summaryRow}>
-                    <View>
-                        <Text style={styles.sectionLabel}>Total Payable</Text>
-                        <Text style={styles.totalValue}>
-                            {totals.total.toLocaleString()} ETB
-                        </Text>
+                    <TextInput
+                        mode="outlined"
+                        value={customerQuery}
+                        onChangeText={setCustomerQuery}
+                        placeholder="Search customers..."
+                        outlineColor="#E5E7EB"
+                        activeOutlineColor={theme.colors.primary}
+                        style={styles.search}
+                        left={<TextInput.Icon icon="magnify" />}
+                    />
+                    <View style={styles.modalList}>
+                        {filteredCustomers.length === 0 ? (
+                            <Text style={styles.modalEmpty}>
+                                No customers found
+                            </Text>
+                        ) : (
+                            filteredCustomers.map((customer) => (
+                                <TouchableRipple
+                                    key={customer.id}
+                                    onPress={() =>
+                                        handleSelectCustomer(customer)
+                                    }
+                                    borderless
+                                    style={styles.suggestionRow}
+                                >
+                                    <View style={styles.modalItemRow}>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.suggestionText}>
+                                                {customer.name}
+                                            </Text>
+                                            <Text style={styles.modalSubText}>
+                                                {customer.phone}
+                                            </Text>
+                                        </View>
+                                        <Text style={styles.modalPrice}>
+                                            ETB{" "}
+                                            {customer.balance.toLocaleString()}
+                                        </Text>
+                                    </View>
+                                </TouchableRipple>
+                            ))
+                        )}
                     </View>
-                    <View style={{ alignItems: "flex-end" }}>
-                        <Text style={styles.sectionLabel}>Items Count</Text>
-                        <Text style={styles.itemsValue}>
-                            {totals.items} Units
-                        </Text>
-                    </View>
-                </Card.Content>
-            </Card>
-
-            <Button
-                mode="contained"
-                icon="check"
-                style={styles.submitButton}
-                onPress={() => {}}
-            >
-                Complete Sale
-            </Button>
-        </Screen>
+                    <Button
+                        mode="outlined"
+                        icon="account-plus-outline"
+                        onPress={() => setAddCustomerVisible((prev) => !prev)}
+                        style={styles.addCustomerButton}
+                    >
+                        Add New Customer
+                    </Button>
+                    {addCustomerVisible && (
+                        <View style={styles.modalEditor}>
+                            <Text style={styles.modalSectionTitle}>
+                                New Customer
+                            </Text>
+                            <TextInput
+                                mode="outlined"
+                                label="Full Name"
+                                value={newCustomerName}
+                                onChangeText={setNewCustomerName}
+                                style={styles.modalField}
+                            />
+                            <TextInput
+                                mode="outlined"
+                                label="Phone"
+                                value={newCustomerPhone}
+                                onChangeText={setNewCustomerPhone}
+                                keyboardType="phone-pad"
+                                style={styles.modalField}
+                            />
+                            <Button
+                                mode="contained"
+                                onPress={handleAddCustomer}
+                            >
+                                Save Customer
+                            </Button>
+                        </View>
+                    )}
+                </Modal>
+            </Portal>
+        </>
     );
 };
 
-const SearchBar = ({ value, onChangeText }) => (
+const SearchBar = ({
+    value,
+    onChangeText,
+    onFocus,
+    onBlur,
+    readOnly,
+    autoFocus,
+}) => (
     <TextInput
         mode="outlined"
         value={value}
         onChangeText={onChangeText}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        editable={!readOnly}
+        autoFocus={autoFocus}
         placeholder="Search products to add..."
         outlineColor="#E5E7EB"
         activeOutlineColor={theme.colors.primary}
@@ -244,7 +692,11 @@ const SearchBar = ({ value, onChangeText }) => (
 const styles = StyleSheet.create({
     container: {
         gap: 16,
-        paddingBottom: 32,
+        paddingBottom: 160,
+        flex: 1,
+    },
+    page: {
+        flex: 1,
     },
     headerRow: {
         flexDirection: "row",
@@ -258,6 +710,102 @@ const styles = StyleSheet.create({
     search: {
         backgroundColor: theme.colors.surface,
         borderRadius: 14,
+    },
+    addProductButton: {
+        borderRadius: 14,
+        borderColor: "#E5E7EB",
+    },
+    linkButton: {
+        color: theme.colors.primary,
+        fontWeight: "600",
+    },
+    suggestionCard: {
+        backgroundColor: theme.colors.surface,
+        borderRadius: 14,
+        elevation: 0,
+        borderWidth: 1,
+        borderColor: "#EEF0F4",
+    },
+    suggestionContent: {
+        paddingVertical: 4,
+        gap: 4,
+    },
+    suggestionRow: {
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+    },
+    suggestionText: {
+        color: theme.colors.text,
+        fontWeight: "600",
+    },
+    modalContainer: {
+        marginHorizontal: 0,
+        backgroundColor: theme.colors.surface,
+        borderTopLeftRadius: 18,
+        borderTopRightRadius: 18,
+        padding: 16,
+        paddingBottom: 24,
+    },
+    modalBottom: {
+        justifyContent: "flex-end",
+        margin: 0,
+    },
+    modalHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: 8,
+    },
+    modalTitle: {
+        color: theme.colors.text,
+        fontWeight: "700",
+        fontSize: 16,
+    },
+    modalList: {
+        marginTop: 12,
+        gap: 6,
+    },
+    modalItemRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+    },
+    modalPrice: {
+        color: theme.colors.onSurface,
+        fontSize: 12,
+        fontWeight: "600",
+    },
+    modalSubText: {
+        color: theme.colors.onSurface,
+        fontSize: 12,
+        marginTop: 2,
+    },
+    modalEmpty: {
+        color: theme.colors.onSurface,
+        fontSize: 12,
+        textAlign: "center",
+        paddingVertical: 12,
+    },
+    modalEditor: {
+        marginTop: 16,
+        gap: 12,
+    },
+    modalSectionTitle: {
+        color: theme.colors.text,
+        fontWeight: "600",
+    },
+    modalFieldRow: {
+        flexDirection: "row",
+        gap: 12,
+    },
+    modalField: {
+        flex: 1,
+        backgroundColor: theme.colors.surface,
+    },
+    addCustomerButton: {
+        marginTop: 12,
+        borderRadius: 12,
     },
     sectionHeader: {
         flexDirection: "row",
@@ -304,20 +852,16 @@ const styles = StyleSheet.create({
         color: theme.colors.onSurface,
         fontSize: 12,
     },
-    qtyWrap: {
-        flexDirection: "row",
-        alignItems: "center",
-        borderWidth: 1,
-        borderColor: "#E5E7EB",
-        borderRadius: 14,
-        paddingHorizontal: 4,
-        backgroundColor: "#F9FAFB",
+    qtyPill: {
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 12,
+        backgroundColor: theme.colors.primaryContainer,
     },
-    qtyValue: {
-        fontWeight: "700",
+    qtyPillText: {
         color: theme.colors.text,
-        minWidth: 16,
-        textAlign: "center",
+        fontWeight: "700",
+        fontSize: 12,
     },
     customerRow: {
         flexDirection: "row",
@@ -380,6 +924,11 @@ const styles = StyleSheet.create({
     },
     submitButton: {
         borderRadius: 16,
+    },
+    footer: {
+        marginTop: "auto",
+        paddingTop: 16,
+        paddingHorizontal: 16,
     },
 });
 

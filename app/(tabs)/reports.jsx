@@ -1,12 +1,33 @@
 import { useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
-import { Card, Chip, Icon, IconButton, Text } from "react-native-paper";
+import { ScrollView, StyleSheet, View } from "react-native";
+import {
+    Button,
+    Card,
+    Chip,
+    Icon,
+    IconButton,
+    Modal,
+    Portal,
+    Text,
+    TextInput,
+} from "react-native-paper";
 import Screen from "../../src/components/Screen";
 import theme from "../../src/theme";
 
 const ReportsScreen = () => {
     const [range, setRange] = useState("month");
     const [filter, setFilter] = useState("all");
+    const [calendarOpen, setCalendarOpen] = useState(false);
+    const [fromDate, setFromDate] = useState("Jan 01, 2026");
+    const [toDate, setToDate] = useState("Feb 03, 2026");
+
+    const rangeLabel = useMemo(() => {
+        if (range === "today") return "Today";
+        if (range === "week") return "This Week";
+        if (range === "month") return "This Month";
+        if (range === "custom") return `${fromDate} – ${toDate}`;
+        return "This Month";
+    }, [range, fromDate, toDate]);
 
     const data = useMemo(
         () => ({
@@ -60,15 +81,11 @@ const ReportsScreen = () => {
     }, [data.items, filter]);
 
     return (
-        <Screen contentContainerStyle={styles.container}>
-            <View style={styles.headerRow}>
-                <Text variant="titleLarge" style={styles.title}>
-                    Profit Analysis
-                </Text>
-                <IconButton icon="download" onPress={() => {}} />
-            </View>
-
-            <Card style={styles.rangeCard}>
+        <Screen style={styles.container}>
+            <Card
+                style={styles.rangeCard}
+                onPress={() => setCalendarOpen(true)}
+            >
                 <Card.Content style={styles.rangeContent}>
                     <View style={styles.rangeLeft}>
                         <View style={styles.rangeIcon}>
@@ -80,7 +97,7 @@ const ReportsScreen = () => {
                         </View>
                         <View>
                             <Text style={styles.rangeLabel}>Time Period</Text>
-                            <Text style={styles.rangeValue}>This Month</Text>
+                            <Text style={styles.rangeValue}>{rangeLabel}</Text>
                         </View>
                     </View>
                     <Icon
@@ -121,56 +138,10 @@ const ReportsScreen = () => {
                 </Card.Content>
             </Card>
 
-            <View style={styles.filterRow}>
-                <Chip
-                    selected={filter === "all"}
-                    onPress={() => setFilter("all")}
-                    mode={filter === "all" ? "flat" : "outlined"}
-                    selectedColor="#FFFFFF"
-                    textStyle={{
-                        color: filter === "all" ? "#FFFFFF" : theme.colors.text,
-                    }}
-                    style={[
-                        styles.filterChip,
-                        filter === "all" && styles.filterChipActive,
-                    ]}
-                >
-                    All items
-                </Chip>
-                <Chip
-                    selected={filter === "high"}
-                    onPress={() => setFilter("high")}
-                    mode={filter === "high" ? "flat" : "outlined"}
-                    selectedColor="#FFFFFF"
-                    textStyle={{
-                        color:
-                            filter === "high" ? "#FFFFFF" : theme.colors.text,
-                    }}
-                    style={[
-                        styles.filterChip,
-                        filter === "high" && styles.filterChipActive,
-                    ]}
-                >
-                    High Margin
-                </Chip>
-                <Chip
-                    selected={filter === "low"}
-                    onPress={() => setFilter("low")}
-                    mode={filter === "low" ? "flat" : "outlined"}
-                    selectedColor="#FFFFFF"
-                    textStyle={{
-                        color: filter === "low" ? "#FFFFFF" : theme.colors.text,
-                    }}
-                    style={[
-                        styles.filterChip,
-                        filter === "low" && styles.filterChipActive,
-                    ]}
-                >
-                    Low Stock
-                </Chip>
-            </View>
-
-            <View style={{ gap: 12, paddingBottom: 24 }}>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ gap: 12, paddingBottom: 24 }}
+            >
                 {filteredItems.map((item) => {
                     const net = item.revenue - item.cogs;
                     return (
@@ -222,7 +193,146 @@ const ReportsScreen = () => {
                         </Card>
                     );
                 })}
-            </View>
+            </ScrollView>
+
+            <Portal>
+                <Modal
+                    visible={calendarOpen}
+                    onDismiss={() => setCalendarOpen(false)}
+                    contentContainerStyle={styles.calendarSheet}
+                >
+                    <View style={styles.sheetHandle} />
+                    <View style={styles.sheetHeader}>
+                        <Text style={styles.sheetTitle}>Select range</Text>
+                        <IconButton
+                            icon="close"
+                            size={20}
+                            onPress={() => setCalendarOpen(false)}
+                        />
+                    </View>
+
+                    <View style={styles.rangeChips}>
+                        <Chip
+                            selected={range === "today"}
+                            onPress={() => setRange("today")}
+                            mode={range === "today" ? "flat" : "outlined"}
+                            selectedColor="#FFFFFF"
+                            textStyle={{
+                                color:
+                                    range === "today"
+                                        ? "#FFFFFF"
+                                        : theme.colors.text,
+                            }}
+                            style={[
+                                styles.filterChip,
+                                range === "today" && styles.filterChipActive,
+                            ]}
+                        >
+                            Today
+                        </Chip>
+                        <Chip
+                            selected={range === "week"}
+                            onPress={() => setRange("week")}
+                            mode={range === "week" ? "flat" : "outlined"}
+                            selectedColor="#FFFFFF"
+                            textStyle={{
+                                color:
+                                    range === "week"
+                                        ? "#FFFFFF"
+                                        : theme.colors.text,
+                            }}
+                            style={[
+                                styles.filterChip,
+                                range === "week" && styles.filterChipActive,
+                            ]}
+                        >
+                            This Week
+                        </Chip>
+                        <Chip
+                            selected={range === "month"}
+                            onPress={() => setRange("month")}
+                            mode={range === "month" ? "flat" : "outlined"}
+                            selectedColor="#FFFFFF"
+                            textStyle={{
+                                color:
+                                    range === "month"
+                                        ? "#FFFFFF"
+                                        : theme.colors.text,
+                            }}
+                            style={[
+                                styles.filterChip,
+                                range === "month" && styles.filterChipActive,
+                            ]}
+                        >
+                            This Month
+                        </Chip>
+                        <Chip
+                            selected={range === "custom"}
+                            onPress={() => setRange("custom")}
+                            mode={range === "custom" ? "flat" : "outlined"}
+                            selectedColor="#FFFFFF"
+                            textStyle={{
+                                color:
+                                    range === "custom"
+                                        ? "#FFFFFF"
+                                        : theme.colors.text,
+                            }}
+                            style={[
+                                styles.filterChip,
+                                range === "custom" && styles.filterChipActive,
+                            ]}
+                        >
+                            Custom
+                        </Chip>
+                    </View>
+
+                    <View style={styles.dateGrid}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.inputLabel}>From</Text>
+                            <TextInput
+                                mode="outlined"
+                                value={fromDate}
+                                onChangeText={setFromDate}
+                                outlineColor="#E5E7EB"
+                                activeOutlineColor={theme.colors.primary}
+                                style={styles.dateInput}
+                                right={<TextInput.Icon icon="calendar" />}
+                                onFocus={() => setRange("custom")}
+                            />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.inputLabel}>To</Text>
+                            <TextInput
+                                mode="outlined"
+                                value={toDate}
+                                onChangeText={setToDate}
+                                outlineColor="#E5E7EB"
+                                activeOutlineColor={theme.colors.primary}
+                                style={styles.dateInput}
+                                right={<TextInput.Icon icon="calendar" />}
+                                onFocus={() => setRange("custom")}
+                            />
+                        </View>
+                    </View>
+
+                    <View style={styles.sheetActions}>
+                        <Button
+                            mode="outlined"
+                            style={{ flex: 1 }}
+                            onPress={() => setCalendarOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            mode="contained"
+                            style={{ flex: 1 }}
+                            onPress={() => setCalendarOpen(false)}
+                        >
+                            Apply
+                        </Button>
+                    </View>
+                </Modal>
+            </Portal>
         </Screen>
     );
 };
@@ -237,6 +347,7 @@ const Metric = ({ label, value }) => (
 const styles = StyleSheet.create({
     container: {
         gap: 14,
+        paddingTop: 6,
     },
     headerRow: {
         flexDirection: "row",
@@ -324,6 +435,54 @@ const styles = StyleSheet.create({
     },
     filterChipActive: {
         backgroundColor: theme.colors.primary,
+    },
+    calendarSheet: {
+        backgroundColor: "#FFFFFF",
+        padding: 16,
+        borderTopLeftRadius: 22,
+        borderTopRightRadius: 22,
+        marginTop: "auto",
+        gap: 16,
+    },
+    sheetHandle: {
+        width: 48,
+        height: 5,
+        borderRadius: 999,
+        backgroundColor: "#E5E7EB",
+        alignSelf: "center",
+    },
+    sheetHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+    },
+    sheetTitle: {
+        color: theme.colors.text,
+        fontWeight: "700",
+    },
+    rangeChips: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 8,
+    },
+    dateGrid: {
+        flexDirection: "row",
+        gap: 12,
+    },
+    inputLabel: {
+        color: theme.colors.onSurface,
+        fontSize: 12,
+        fontWeight: "600",
+        textTransform: "uppercase",
+        marginBottom: 6,
+    },
+    dateInput: {
+        backgroundColor: theme.colors.surface,
+        borderRadius: 14,
+    },
+    sheetActions: {
+        flexDirection: "row",
+        gap: 12,
     },
     itemCard: {
         backgroundColor: theme.colors.surface,

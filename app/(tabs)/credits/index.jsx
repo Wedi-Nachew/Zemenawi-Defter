@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import { useMemo, useState } from "react";
 import { FlatList, StyleSheet, View } from "react-native";
 import {
@@ -64,166 +64,187 @@ const CustomerCreditsScreen = () => {
     }, [customers, filter, query]);
 
     return (
-        <Screen contentContainerStyle={styles.container}>
-            <View style={styles.headerRow}>
-                <Text variant="titleLarge" style={styles.title}>
-                    Credits
-                </Text>
-                <IconButton icon="dots-horizontal" onPress={() => {}} />
-            </View>
-
-            <Card style={styles.summaryCard}>
-                <Card.Content style={styles.summaryContent}>
-                    <View style={{ gap: 6 }}>
-                        <Text style={styles.summaryLabel}>
-                            Total Outstanding Credit
-                        </Text>
-                        <Text
-                            variant="headlineMedium"
-                            style={styles.summaryValue}
-                        >
-                            ETB {totalOutstanding.toLocaleString()}
-                        </Text>
-                    </View>
-                    <Button mode="contained" compact onPress={() => {}}>
-                        View History
-                    </Button>
-                </Card.Content>
-            </Card>
-
-            <Searchbar
-                value={query}
-                onChangeText={setQuery}
-                placeholder="Search customers..."
-                style={styles.search}
-                inputStyle={{ fontSize: 15 }}
-                iconColor={theme.colors.onSurface}
+        <>
+            <Stack.Screen
+                options={{
+                    headerTitle: "Credits",
+                    headerTitleStyle: {
+                        fontSize: 22,
+                        fontWeight: "700",
+                    },
+                    headerRight: () => (
+                        <IconButton
+                            icon="plus"
+                            mode="contained"
+                            containerColor={theme.colors.primary}
+                            iconColor="#FFFFFF"
+                            size={22}
+                            onPress={() => router.push("/(tabs)/sales/new")}
+                        />
+                    ),
+                }}
             />
+            <Screen style={styles.container}>
+                <Card style={styles.summaryCard}>
+                    <Card.Content style={styles.summaryContent}>
+                        <View style={{ gap: 6 }}>
+                            <Text style={styles.summaryLabel}>
+                                Total Outstanding Credit
+                            </Text>
+                            <Text
+                                variant="headlineMedium"
+                                style={styles.summaryValue}
+                            >
+                                ETB {totalOutstanding.toLocaleString()}
+                            </Text>
+                        </View>
+                        <Button mode="contained" compact onPress={() => {}}>
+                            View History
+                        </Button>
+                    </Card.Content>
+                </Card>
 
-            <View style={styles.filterRow}>
-                <Chip
-                    selected={filter === "all"}
-                    onPress={() => setFilter("all")}
-                    mode={filter === "all" ? "flat" : "outlined"}
-                    selectedColor="#FFFFFF"
-                    textStyle={{
-                        color: filter === "all" ? "#FFFFFF" : theme.colors.text,
-                    }}
-                    style={[
-                        styles.filterChip,
-                        filter === "all" && styles.filterChipActive,
-                    ]}
-                >
-                    All
-                </Chip>
-                <Chip
-                    selected={filter === "balance"}
-                    onPress={() => setFilter("balance")}
-                    mode={filter === "balance" ? "flat" : "outlined"}
-                    selectedColor="#FFFFFF"
-                    textStyle={{
-                        color:
-                            filter === "balance"
-                                ? "#FFFFFF"
-                                : theme.colors.text,
-                    }}
-                    style={[
-                        styles.filterChip,
-                        filter === "balance" && styles.filterChipActive,
-                    ]}
-                >
-                    Has Balance
-                </Chip>
-                <Chip
-                    selected={filter === "paid"}
-                    onPress={() => setFilter("paid")}
-                    mode={filter === "paid" ? "flat" : "outlined"}
-                    selectedColor="#FFFFFF"
-                    textStyle={{
-                        color:
-                            filter === "paid" ? "#FFFFFF" : theme.colors.text,
-                    }}
-                    style={[
-                        styles.filterChip,
-                        filter === "paid" && styles.filterChipActive,
-                    ]}
-                >
-                    Paid Off
-                </Chip>
-            </View>
+                <Searchbar
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder="Search customers..."
+                    style={styles.search}
+                    inputStyle={{ fontSize: 15 }}
+                    iconColor={theme.colors.onSurface}
+                />
 
-            <FlatList
-                data={filteredCustomers}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={{ gap: 12, paddingBottom: 28 }}
-                renderItem={({ item }) => (
-                    <Card
-                        style={styles.card}
-                        onPress={() =>
-                            router.push({
-                                pathname: "/(tabs)/credits/details",
-                                params: { id: item.id },
-                            })
-                        }
+                <View style={styles.filterRow}>
+                    <Chip
+                        selected={filter === "all"}
+                        onPress={() => setFilter("all")}
+                        mode={filter === "all" ? "flat" : "outlined"}
+                        selectedColor="#FFFFFF"
+                        textStyle={{
+                            color:
+                                filter === "all"
+                                    ? "#FFFFFF"
+                                    : theme.colors.text,
+                        }}
+                        style={[
+                            styles.filterChip,
+                            filter === "all" && styles.filterChipActive,
+                        ]}
                     >
-                        <Card.Content style={styles.cardContent}>
-                            <View style={styles.customerRow}>
-                                <InitialAvatar name={item.name} />
-                                <View style={{ flex: 1 }}>
-                                    <Text
-                                        variant="titleMedium"
-                                        style={styles.cardTitle}
-                                    >
-                                        {item.name}
-                                    </Text>
-                                    <Text style={styles.subtitle}>
-                                        {item.phone}
-                                    </Text>
-                                </View>
-                                <View
-                                    style={{ alignItems: "flex-end", gap: 6 }}
-                                >
-                                    <Text style={styles.balanceValue}>
-                                        ETB {item.balance.toLocaleString()}
-                                    </Text>
-                                    <Chip
-                                        compact
-                                        mode="outlined"
-                                        style={
-                                            item.balance > 0
-                                                ? styles.balanceChip
-                                                : styles.paidChip
-                                        }
-                                        textStyle={{
-                                            color:
-                                                item.balance > 0
-                                                    ? theme.colors.error
-                                                    : theme.colors.secondary,
+                        All
+                    </Chip>
+                    <Chip
+                        selected={filter === "balance"}
+                        onPress={() => setFilter("balance")}
+                        mode={filter === "balance" ? "flat" : "outlined"}
+                        selectedColor="#FFFFFF"
+                        textStyle={{
+                            color:
+                                filter === "balance"
+                                    ? "#FFFFFF"
+                                    : theme.colors.text,
+                        }}
+                        style={[
+                            styles.filterChip,
+                            filter === "balance" && styles.filterChipActive,
+                        ]}
+                    >
+                        Has Balance
+                    </Chip>
+                    <Chip
+                        selected={filter === "paid"}
+                        onPress={() => setFilter("paid")}
+                        mode={filter === "paid" ? "flat" : "outlined"}
+                        selectedColor="#FFFFFF"
+                        textStyle={{
+                            color:
+                                filter === "paid"
+                                    ? "#FFFFFF"
+                                    : theme.colors.text,
+                        }}
+                        style={[
+                            styles.filterChip,
+                            filter === "paid" && styles.filterChipActive,
+                        ]}
+                    >
+                        Paid Off
+                    </Chip>
+                </View>
+
+                <FlatList
+                    data={filteredCustomers}
+                    keyExtractor={(item) => item.id}
+                    contentContainerStyle={{ gap: 12, paddingBottom: 28 }}
+                    renderItem={({ item }) => (
+                        <Card
+                            style={styles.card}
+                            onPress={() =>
+                                router.push({
+                                    pathname: "/(tabs)/credits/details",
+                                    params: { id: item.id },
+                                })
+                            }
+                        >
+                            <Card.Content style={styles.cardContent}>
+                                <View style={styles.customerRow}>
+                                    <InitialAvatar name={item.name} />
+                                    <View style={{ flex: 1 }}>
+                                        <Text
+                                            variant="titleMedium"
+                                            style={styles.cardTitle}
+                                        >
+                                            {item.name}
+                                        </Text>
+                                        <Text style={styles.subtitle}>
+                                            {item.phone}
+                                        </Text>
+                                    </View>
+                                    <View
+                                        style={{
+                                            alignItems: "flex-end",
+                                            gap: 6,
                                         }}
                                     >
-                                        {item.balance > 0
-                                            ? "Has Balance"
-                                            : "Paid"}
-                                    </Chip>
+                                        <Text style={styles.balanceValue}>
+                                            ETB {item.balance.toLocaleString()}
+                                        </Text>
+                                        <Chip
+                                            compact
+                                            mode="outlined"
+                                            style={
+                                                item.balance > 0
+                                                    ? styles.balanceChip
+                                                    : styles.paidChip
+                                            }
+                                            textStyle={{
+                                                color:
+                                                    item.balance > 0
+                                                        ? theme.colors.error
+                                                        : theme.colors
+                                                              .secondary,
+                                            }}
+                                        >
+                                            {item.balance > 0
+                                                ? "Has Balance"
+                                                : "Paid"}
+                                        </Chip>
+                                    </View>
                                 </View>
-                            </View>
-                        </Card.Content>
-                    </Card>
-                )}
-            />
-        </Screen>
+                            </Card.Content>
+                        </Card>
+                    )}
+                />
+            </Screen>
+        </>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         gap: 14,
+        paddingTop: 6,
+        paddingBottom: 24,
     },
-    headerRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-    },
+
     title: {
         color: theme.colors.text,
         fontWeight: "700",

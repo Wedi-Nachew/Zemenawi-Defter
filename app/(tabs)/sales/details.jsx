@@ -1,6 +1,6 @@
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo } from "react";
-import { StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import {
     Button,
     Card,
@@ -126,159 +126,201 @@ const SaleDetailsScreen = () => {
     const status = getStatusTone(sale.status);
 
     return (
-        <Screen contentContainerStyle={styles.container}>
-            <View style={styles.headerRow}>
-                <IconButton icon="arrow-left" onPress={() => router.back()} />
-                <Text variant="titleMedium" style={styles.title}>
-                    Sale Details
-                </Text>
-                <IconButton icon="dots-horizontal" onPress={() => {}} />
-            </View>
-
-            <Card style={styles.heroCard}>
-                <Card.Content style={{ gap: 12 }}>
-                    <View style={styles.heroRow}>
-                        <View
-                            style={[
-                                styles.avatar,
-                                { backgroundColor: status.iconBg },
-                            ]}
-                        >
-                            <Icon
-                                source={status.icon}
-                                color={status.iconColor}
-                                size={18}
-                            />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.cardTitle}>
-                                {sale.customer}
-                            </Text>
-                            <Text style={styles.meta}>
-                                {sale.receipt} • {sale.time}
-                            </Text>
-                        </View>
-                        <View
-                            style={[
-                                styles.statusPill,
-                                { backgroundColor: status.pillBg },
-                            ]}
-                        >
-                            <Text
-                                style={[
-                                    styles.statusText,
-                                    { color: status.pillText },
-                                ]}
-                            >
-                                {status.label}
-                            </Text>
-                        </View>
-                    </View>
-                    <View style={styles.amountRow}>
-                        <Text style={styles.meta}>Total</Text>
-                        <Text style={styles.amountValue}>
-                            ETB {totals.total.toLocaleString()}
-                        </Text>
-                    </View>
-                    <View style={styles.amountRow}>
-                        <Text style={styles.meta}>Profit / Loss</Text>
-                        <Text style={profit >= 0 ? styles.profit : styles.loss}>
-                            {profit >= 0
-                                ? `ETB ${profit.toLocaleString()}`
-                                : `- ETB ${Math.abs(profit).toLocaleString()}`}
-                        </Text>
-                    </View>
-                </Card.Content>
-            </Card>
-
-            <Card style={styles.card}>
-                <Card.Content style={{ gap: 10 }}>
-                    <Text style={styles.sectionTitle}>Items</Text>
-                    {sale.items.map((item, idx) => (
-                        <View key={item.id} style={styles.itemRow}>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.cardTitle}>
-                                    {item.name}
-                                </Text>
-                                <Text style={styles.meta}>
-                                    Qty {item.qty} • ETB{" "}
-                                    {item.price.toLocaleString()}
+        <>
+            <Stack.Screen
+                options={{
+                    headerTitle: sale.customer,
+                    headerTitleStyle: {
+                        fontWeight: "700",
+                        fontSize: 20,
+                    },
+                    headerTitleAlign: "center",
+                }}
+            />
+            <Screen>
+                <ScrollView
+                    style={{ flex: 1, gap: 16 }}
+                    showsVerticalScrollIndicator={false}
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.container}
+                >
+                    <Card style={styles.heroCard}>
+                        <Card.Content style={{ gap: 12 }}>
+                            <View style={styles.heroRow}>
+                                <View
+                                    style={[
+                                        styles.avatar,
+                                        { backgroundColor: status.iconBg },
+                                    ]}
+                                >
+                                    <Icon
+                                        source={status.icon}
+                                        color={status.iconColor}
+                                        size={18}
+                                    />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.cardTitle}>
+                                        {sale.customer}
+                                    </Text>
+                                    <Text style={styles.meta}>
+                                        {sale.receipt} • {sale.time}
+                                    </Text>
+                                </View>
+                                <View
+                                    style={[
+                                        styles.statusPill,
+                                        { backgroundColor: status.pillBg },
+                                    ]}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.statusText,
+                                            { color: status.pillText },
+                                        ]}
+                                    >
+                                        {status.label}
+                                    </Text>
+                                </View>
+                            </View>
+                            <View style={styles.amountRow}>
+                                <Text style={styles.meta}>Total</Text>
+                                <Text style={styles.amountValue}>
+                                    ETB {totals.total.toLocaleString()}
                                 </Text>
                             </View>
-                            <Text style={styles.itemTotal}>
-                                ETB {(item.qty * item.price).toLocaleString()}
-                            </Text>
-                            {idx < sale.items.length - 1 && (
-                                <Divider style={{ marginTop: 10 }} />
-                            )}
-                        </View>
-                    ))}
-                </Card.Content>
-            </Card>
+                            <View style={styles.amountRow}>
+                                <Text style={styles.meta}>Profit / Loss</Text>
+                                <Text
+                                    style={
+                                        profit >= 0
+                                            ? styles.profit
+                                            : styles.loss
+                                    }
+                                >
+                                    {profit >= 0
+                                        ? `ETB ${profit.toLocaleString()}`
+                                        : `- ETB ${Math.abs(profit).toLocaleString()}`}
+                                </Text>
+                            </View>
+                        </Card.Content>
+                    </Card>
 
-            <Card style={styles.card}>
-                <Card.Content style={{ gap: 10 }}>
-                    <Text style={styles.sectionTitle}>Payment</Text>
-                    <View style={styles.rowBetween}>
-                        <Text style={styles.meta}>Method</Text>
-                        <Text style={styles.cardTitle}>
-                            {sale.paymentMethod}
-                        </Text>
-                    </View>
-                    <View style={styles.rowBetween}>
-                        <Text style={styles.meta}>Paid</Text>
-                        <Text style={styles.cardTitle}>
-                            ETB {sale.paidAmount.toLocaleString()}
-                        </Text>
-                    </View>
-                    <View style={styles.rowBetween}>
-                        <Text style={styles.meta}>Balance</Text>
-                        <Text
-                            style={[
-                                styles.cardTitle,
-                                {
-                                    color:
-                                        balance > 0
-                                            ? theme.colors.warning
-                                            : theme.colors.secondary,
-                                },
-                            ]}
-                        >
-                            ETB {balance.toLocaleString()}
-                        </Text>
-                    </View>
-                    <View style={styles.rowBetween}>
-                        <Text style={styles.meta}>Profit / Loss</Text>
-                        <Text style={profit >= 0 ? styles.profit : styles.loss}>
-                            {profit >= 0
-                                ? `ETB ${profit.toLocaleString()}`
-                                : `- ETB ${Math.abs(profit).toLocaleString()}`}
-                        </Text>
-                    </View>
-                </Card.Content>
-            </Card>
+                    <Card style={styles.card}>
+                        <Card.Content style={{ gap: 10 }}>
+                            <Text style={styles.sectionTitle}>Items</Text>
+                            {sale.items.map((item, idx) => (
+                                <View key={item.id} style={styles.itemRow}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.cardTitle}>
+                                            {item.name}
+                                        </Text>
+                                        <Text style={styles.meta}>
+                                            Qty {item.qty} • ETB{" "}
+                                            {item.price.toLocaleString()}
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.itemTotal}>
+                                        ETB{" "}
+                                        {(
+                                            item.qty * item.price
+                                        ).toLocaleString()}
+                                    </Text>
+                                    {idx < sale.items.length - 1 && (
+                                        <Divider style={{ marginTop: 10 }} />
+                                    )}
+                                </View>
+                            ))}
+                        </Card.Content>
+                    </Card>
 
-            <Card style={styles.summaryCard}>
-                <Card.Content style={styles.summaryRow}>
-                    <View>
-                        <Text style={styles.meta}>Items Count</Text>
-                        <Text style={styles.cardTitle}>
-                            {totals.items} Units
-                        </Text>
-                    </View>
-                    <View style={{ alignItems: "flex-end" }}>
-                        <Text style={styles.meta}>Total Payable</Text>
-                        <Text style={styles.amountValue}>
-                            ETB {totals.total.toLocaleString()}
-                        </Text>
-                    </View>
-                </Card.Content>
-            </Card>
+                    <Card style={styles.card}>
+                        <Card.Content style={{ gap: 10 }}>
+                            <Text style={styles.sectionTitle}>Payment</Text>
+                            <View style={styles.rowBetween}>
+                                <Text style={styles.meta}>Method</Text>
+                                <Text style={styles.cardTitle}>
+                                    {sale.paymentMethod}
+                                </Text>
+                            </View>
+                            <View style={styles.rowBetween}>
+                                <Text style={styles.meta}>Paid</Text>
+                                <Text style={styles.cardTitle}>
+                                    ETB {sale.paidAmount.toLocaleString()}
+                                </Text>
+                            </View>
+                            <View style={styles.rowBetween}>
+                                <Text style={styles.meta}>Balance</Text>
+                                <Text
+                                    style={[
+                                        styles.cardTitle,
+                                        {
+                                            color:
+                                                balance > 0
+                                                    ? theme.colors.warning
+                                                    : theme.colors.secondary,
+                                        },
+                                    ]}
+                                >
+                                    ETB {balance.toLocaleString()}
+                                </Text>
+                            </View>
+                            <View style={styles.rowBetween}>
+                                <Text style={styles.meta}>Profit / Loss</Text>
+                                <Text
+                                    style={
+                                        profit >= 0
+                                            ? styles.profit
+                                            : styles.loss
+                                    }
+                                >
+                                    {profit >= 0
+                                        ? `ETB ${profit.toLocaleString()}`
+                                        : `- ETB ${Math.abs(profit).toLocaleString()}`}
+                                </Text>
+                            </View>
+                        </Card.Content>
+                    </Card>
 
-            <Button mode="contained" icon="receipt" onPress={() => {}}>
-                View Receipt
-            </Button>
-        </Screen>
+                    <Card style={styles.summaryCard}>
+                        <Card.Content style={styles.summaryRow}>
+                            <View>
+                                <Text style={styles.meta}>Items Count</Text>
+                                <Text style={styles.cardTitle}>
+                                    {totals.items} Units
+                                </Text>
+                            </View>
+                            <View style={{ alignItems: "flex-end" }}>
+                                <Text style={styles.meta}>Total Payable</Text>
+                                <Text style={styles.amountValue}>
+                                    ETB {totals.total.toLocaleString()}
+                                </Text>
+                            </View>
+                        </Card.Content>
+                    </Card>
+                </ScrollView>
+
+                <View style={styles.actionsRow}>
+                    <Button
+                        mode="contained"
+                        icon="pencil"
+                        style={{ flex: 1 }}
+                        onPress={() => {}}
+                    >
+                        Edit Sale
+                    </Button>
+                    <Button
+                        mode="outlined"
+                        icon="trash-can-outline"
+                        style={{ flex: 1, borderColor: theme.colors.error }}
+                        onPress={() => {}}
+                        labelStyle={{ color: theme.colors.error }}
+                    >
+                        Delete Sale
+                    </Button>
+                </View>
+            </Screen>
+        </>
     );
 };
 
@@ -317,11 +359,17 @@ const styles = StyleSheet.create({
     container: {
         gap: 16,
         paddingBottom: 32,
+        paddingTop: 4,
     },
     headerRow: {
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
+    },
+    actionsRow: {
+        flexDirection: "row",
+        gap: 12,
+        marginTop: 16,
     },
     title: {
         color: theme.colors.text,

@@ -3,7 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { Button, Text } from "react-native-paper";
 import LowStockAlert from "../../src/components/LowStockAlert";
 import RecentSaleItem from "../../src/components/RecentSaleItem";
-import Screen from "../../src/components/Screen";
+import ScrollScreen from "../../src/components/ScrollScreen";
 import StatCard from "../../src/components/StatCard";
 import theme from "../../src/theme";
 
@@ -105,7 +105,7 @@ const HomeScreen = () => {
     );
 
     return (
-        <Screen contentContainerStyle={styles.container}>
+        <ScrollScreen style={styles.container}>
             <View style={styles.statsRow}>
                 {stats.map((stat) => (
                     <StatCard key={stat.label} {...stat} />
@@ -163,15 +163,15 @@ const HomeScreen = () => {
                     <RecentSaleItem key={sale.id} {...sale} />
                 ))}
             </View>
-        </Screen>
+        </ScrollScreen>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         gap: 16,
-        paddingBottom: 28,
-        paddingTop: 0,
+        // paddingBottom: 28,
+        // paddingVertical: 12,
     },
 
     subtitle: {

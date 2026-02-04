@@ -1,6 +1,6 @@
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import {
     Button,
     Card,
@@ -147,6 +147,10 @@ const ProductDetails = () => {
         setSheet("edit-stock");
     };
 
+    const openDeleteProductConfirmation = () => {
+        setSheet("delete-confimartion");
+    };
+
     const openEditProduct = () => {
         setProductName(product.name);
         setProductUnit(product.unit);
@@ -155,289 +159,335 @@ const ProductDetails = () => {
     };
 
     return (
-        <Screen contentContainerStyle={styles.container}>
-            <View style={styles.headerRow}>
-                <IconButton icon="arrow-left" onPress={() => router.back()} />
-                <Text variant="titleMedium" style={styles.title}>
-                    {product.name}
-                </Text>
-                <IconButton
-                    icon="dots-horizontal"
-                    onPress={() => {}}
-                    accessibilityLabel="More"
-                />
-            </View>
-
-            <Card style={styles.heroCard}>
-                <Card.Content style={{ gap: 12 }}>
-                    <View style={styles.heroRow}>
-                        <View
-                            style={[
-                                styles.iconWrap,
-                                { backgroundColor: status.bg },
-                            ]}
-                        >
-                            <Icon
-                                source="cube-outline"
-                                color={status.icon}
-                                size={22}
-                            />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <Text variant="headlineSmall" style={styles.title}>
-                                {product.name}
-                            </Text>
-                            <Text style={styles.meta}>
-                                Unit: {product.unit}
-                            </Text>
-                        </View>
-                        <Chip
-                            compact
-                            style={[
-                                styles.statusChip,
-                                { backgroundColor: status.badgeBg },
-                            ]}
-                            textStyle={{
-                                color: status.badgeText,
-                                fontWeight: "700",
-                            }}
-                        >
-                            {status.label}
-                        </Chip>
-                    </View>
-                    <View style={styles.priceRow}>
-                        <Text style={styles.priceLabel}>Selling Price</Text>
-                        <Text style={styles.priceValue}>
-                            ETB {product.price.toLocaleString()}
-                        </Text>
-                    </View>
-                </Card.Content>
-            </Card>
-
-            <Card style={styles.infoCard}>
-                <Card.Content style={styles.infoGrid}>
-                    <InfoCell
-                        label="Current Stock"
-                        value={`${product.stock} ${product.unit}`}
-                        tone={status.badgeBg}
-                    />
-                    <InfoCell
-                        label="Unit Price"
-                        value={`ETB ${product.price.toLocaleString()}`}
-                    />
-                    <InfoCell label="SKU" value={product.id.toUpperCase()} />
-                </Card.Content>
-            </Card>
-
-            <Card style={styles.batchCard}>
-                <Card.Content style={{ gap: 12 }}>
-                    <View style={styles.batchHeader}>
-                        <View style={styles.batchIconWrap}>
-                            <Icon
-                                source="layers-outline"
-                                color={theme.colors.primary}
-                                size={18}
-                            />
-                        </View>
-                        <Text style={styles.batchTitle}>Batch History</Text>
-                    </View>
-                    {product.batches.map((batch, idx) => (
-                        <View key={batch.id} style={{ paddingVertical: 6 }}>
-                            <View style={styles.batchRow}>
-                                <View>
-                                    <Text style={styles.title}>
-                                        {batch.date}
+        <>
+            <Stack.Screen
+                options={{
+                    headerTitle: product.name,
+                    headerTitleStyle: {
+                        fontWeight: "700",
+                        fontSize: 20,
+                    },
+                    headerTitleAlign: "center",
+                }}
+            />
+            <Screen>
+                <ScrollView
+                    style={{ flex: 1, gap: 16 }}
+                    showsVerticalScrollIndicator={false}
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.container}
+                >
+                    <Card style={styles.heroCard}>
+                        <Card.Content style={{ gap: 12 }}>
+                            <View style={styles.heroRow}>
+                                <View
+                                    style={[
+                                        styles.iconWrap,
+                                        { backgroundColor: status.bg },
+                                    ]}
+                                >
+                                    <Icon
+                                        source="cube-outline"
+                                        color={status.icon}
+                                        size={22}
+                                    />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text
+                                        variant="headlineSmall"
+                                        style={styles.title}
+                                    >
+                                        {product.name}
                                     </Text>
                                     <Text style={styles.meta}>
-                                        {batch.remaining} left
+                                        Unit: {product.unit}
                                     </Text>
                                 </View>
-                                <Button
-                                    mode="outlined"
+                                <Chip
                                     compact
-                                    icon="pencil"
-                                    onPress={() => openEditBatch(batch)}
+                                    style={[
+                                        styles.statusChip,
+                                        { backgroundColor: status.badgeBg },
+                                    ]}
+                                    textStyle={{
+                                        color: status.badgeText,
+                                        fontWeight: "700",
+                                    }}
                                 >
-                                    Edit Stock
-                                </Button>
+                                    {status.label}
+                                </Chip>
                             </View>
-                            <Text style={styles.meta}>
-                                Purchase ETB{" "}
-                                {batch.purchasePrice.toLocaleString()}
-                            </Text>
-                            {idx < product.batches.length - 1 && (
-                                <Divider style={{ marginTop: 10 }} />
-                            )}
-                        </View>
-                    ))}
-                </Card.Content>
-            </Card>
-
-            <View style={styles.actionsRow}>
-                <Button
-                    mode="outlined"
-                    icon="pencil"
-                    style={{ flex: 1 }}
-                    onPress={openEditProduct}
-                >
-                    Edit Product
-                </Button>
-                <Button
-                    mode="contained"
-                    icon="plus"
-                    style={{ flex: 1 }}
-                    onPress={openAddStock}
-                >
-                    Add Stock
-                </Button>
-            </View>
-            <Button mode="contained-tonal" icon="cart" onPress={() => {}}>
-                Record Sale
-            </Button>
-
-            <Portal>
-                <Modal
-                    visible={!!sheet}
-                    onDismiss={() => setSheet(null)}
-                    contentContainerStyle={styles.sheet}
-                >
-                    <View style={styles.sheetHandle} />
-                    <View style={styles.sheetHeader}>
-                        <Text variant="titleMedium" style={styles.sheetTitle}>
-                            {sheet === "edit-product"
-                                ? "Edit Product"
-                                : sheet === "edit-stock"
-                                  ? "Edit Batch Stock"
-                                  : "Add Stock"}
-                        </Text>
-                        <IconButton
-                            icon="close"
-                            onPress={() => setSheet(null)}
-                        />
-                    </View>
-
-                    {sheet === "edit-product" ? (
-                        <View style={{ gap: 8 }}>
-                            <View>
-                                <Text style={styles.sheetLabel}>
-                                    Product Name
+                            <View style={styles.priceRow}>
+                                <Text style={styles.priceLabel}>
+                                    Selling Price
                                 </Text>
-                                <TextInput
-                                    mode="outlined"
-                                    value={productName}
-                                    onChangeText={setProductName}
-                                    outlineColor="#E5E7EB"
-                                    activeOutlineColor={theme.colors.primary}
-                                    style={styles.sheetInput}
-                                />
-                            </View>
-                            <View style={styles.sheetGrid}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.sheetLabel}>Unit</Text>
-                                    <TextInput
-                                        mode="outlined"
-                                        value={productUnit}
-                                        onChangeText={setProductUnit}
-                                        outlineColor="#E5E7EB"
-                                        activeOutlineColor={
-                                            theme.colors.primary
-                                        }
-                                        style={styles.sheetInput}
-                                    />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.sheetLabel}>
-                                        Unit Price
-                                    </Text>
-                                    <TextInput
-                                        mode="outlined"
-                                        value={productPrice}
-                                        onChangeText={setProductPrice}
-                                        keyboardType="numeric"
-                                        outlineColor="#E5E7EB"
-                                        activeOutlineColor={
-                                            theme.colors.primary
-                                        }
-                                        style={styles.sheetInput}
-                                        left={<TextInput.Affix text="ETB" />}
-                                    />
-                                </View>
-                            </View>
-                        </View>
-                    ) : (
-                        <View>
-                            <View style={styles.sheetGrid}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.sheetLabel}>
-                                        Quantity
-                                    </Text>
-                                    <TextInput
-                                        mode="outlined"
-                                        value={qty}
-                                        onChangeText={setQty}
-                                        keyboardType="numeric"
-                                        outlineColor="#E5E7EB"
-                                        activeOutlineColor={
-                                            theme.colors.primary
-                                        }
-                                        style={styles.sheetInput}
-                                    />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.sheetLabel}>
-                                        Unit Cost
-                                    </Text>
-                                    <TextInput
-                                        mode="outlined"
-                                        value={cost}
-                                        onChangeText={setCost}
-                                        keyboardType="numeric"
-                                        outlineColor="#E5E7EB"
-                                        activeOutlineColor={
-                                            theme.colors.primary
-                                        }
-                                        style={styles.sheetInput}
-                                        left={<TextInput.Affix text="ETB" />}
-                                    />
-                                </View>
-                            </View>
-
-                            <View>
-                                <Text style={styles.sheetLabel}>
-                                    Date Received
+                                <Text style={styles.priceValue}>
+                                    ETB {product.price.toLocaleString()}
                                 </Text>
-                                <TextInput
-                                    mode="outlined"
-                                    value={dateReceived}
-                                    onChangeText={setDateReceived}
-                                    outlineColor="#E5E7EB"
-                                    activeOutlineColor={theme.colors.primary}
-                                    style={styles.sheetInput}
-                                    right={<TextInput.Icon icon="calendar" />}
-                                />
                             </View>
-                        </View>
-                    )}
+                        </Card.Content>
+                    </Card>
 
-                    <View style={styles.sheetActions}>
-                        <Button
-                            mode="outlined"
-                            style={{ flex: 1 }}
-                            onPress={() => setSheet(null)}
-                        >
-                            Cancel
-                        </Button>
+                    <View style={styles.actionsRow}>
                         <Button
                             mode="contained"
+                            icon="plus"
                             style={{ flex: 1 }}
-                            onPress={() => setSheet(null)}
+                            onPress={openAddStock}
                         >
-                            Save
+                            Add Stock
+                        </Button>
+                        <Button
+                            mode="outlined"
+                            icon="pencil"
+                            style={{ flex: 1 }}
+                            onPress={openEditProduct}
+                        >
+                            Edit Product
                         </Button>
                     </View>
-                </Modal>
-            </Portal>
-        </Screen>
+
+                    <Card style={styles.infoCard}>
+                        <Card.Content style={styles.infoGrid}>
+                            <InfoCell
+                                label="Current Stock"
+                                value={`${product.stock} ${product.unit}`}
+                                tone={status.badgeBg}
+                            />
+                            <InfoCell
+                                label="Unit Price"
+                                value={`ETB ${product.price.toLocaleString()}`}
+                            />
+                            <InfoCell
+                                label="SKU"
+                                value={product.id.toUpperCase()}
+                            />
+                        </Card.Content>
+                    </Card>
+
+                    <Card style={styles.batchCard}>
+                        <Card.Content style={{ gap: 12 }}>
+                            <View style={styles.batchHeader}>
+                                <View style={styles.batchIconWrap}>
+                                    <Icon
+                                        source="layers-outline"
+                                        color={theme.colors.primary}
+                                        size={18}
+                                    />
+                                </View>
+                                <Text style={styles.batchTitle}>
+                                    Batch History
+                                </Text>
+                            </View>
+                            {product.batches.map((batch, idx) => (
+                                <View
+                                    key={batch.id}
+                                    style={{ paddingVertical: 6 }}
+                                >
+                                    <View style={styles.batchRow}>
+                                        <View>
+                                            <Text style={styles.title}>
+                                                {batch.date}
+                                            </Text>
+                                            <Text style={styles.meta}>
+                                                {batch.remaining} left
+                                            </Text>
+                                        </View>
+                                        <Button
+                                            mode="outlined"
+                                            compact
+                                            icon="pencil"
+                                            onPress={() => openEditBatch(batch)}
+                                        >
+                                            Edit Stock
+                                        </Button>
+                                    </View>
+                                    <Text style={styles.meta}>
+                                        Purchase ETB{" "}
+                                        {batch.purchasePrice.toLocaleString()}
+                                    </Text>
+                                    {idx < product.batches.length - 1 && (
+                                        <Divider style={{ marginTop: 10 }} />
+                                    )}
+                                </View>
+                            ))}
+                        </Card.Content>
+                    </Card>
+                </ScrollView>
+
+                <View style={styles.deleteButtonContainer}>
+                    <Button
+                        mode="text"
+                        icon="trash-can"
+                        style={styles.deleteButton}
+                        labelStyle={{
+                            color: theme.colors.error,
+                            fontWeight: "bold",
+                        }}
+                        onPress={() => Alert.alert("deleting")}
+                    >
+                        Delete Product
+                    </Button>
+                </View>
+                <Portal>
+                    <Modal
+                        visible={!!sheet}
+                        onDismiss={() => setSheet(null)}
+                        contentContainerStyle={styles.sheet}
+                    >
+                        <View style={styles.sheetHandle} />
+                        <View style={styles.sheetHeader}>
+                            <Text
+                                variant="titleMedium"
+                                style={styles.sheetTitle}
+                            >
+                                {sheet === "edit-product"
+                                    ? "Edit Product"
+                                    : sheet === "edit-stock"
+                                      ? "Edit Batch Stock"
+                                      : "Add Stock"}
+                            </Text>
+                            <IconButton
+                                icon="close"
+                                onPress={() => setSheet(null)}
+                            />
+                        </View>
+
+                        {sheet === "edit-product" ? (
+                            <View style={{ gap: 8 }}>
+                                <View>
+                                    <Text style={styles.sheetLabel}>
+                                        Product Name
+                                    </Text>
+                                    <TextInput
+                                        mode="outlined"
+                                        value={productName}
+                                        onChangeText={setProductName}
+                                        outlineColor="#E5E7EB"
+                                        activeOutlineColor={
+                                            theme.colors.primary
+                                        }
+                                        style={styles.sheetInput}
+                                    />
+                                </View>
+                                <View style={styles.sheetGrid}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.sheetLabel}>
+                                            Unit
+                                        </Text>
+                                        <TextInput
+                                            mode="outlined"
+                                            value={productUnit}
+                                            onChangeText={setProductUnit}
+                                            outlineColor="#E5E7EB"
+                                            activeOutlineColor={
+                                                theme.colors.primary
+                                            }
+                                            style={styles.sheetInput}
+                                        />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.sheetLabel}>
+                                            Unit Price
+                                        </Text>
+                                        <TextInput
+                                            mode="outlined"
+                                            value={productPrice}
+                                            onChangeText={setProductPrice}
+                                            keyboardType="numeric"
+                                            outlineColor="#E5E7EB"
+                                            activeOutlineColor={
+                                                theme.colors.primary
+                                            }
+                                            style={styles.sheetInput}
+                                            left={
+                                                <TextInput.Affix text="ETB" />
+                                            }
+                                        />
+                                    </View>
+                                </View>
+                            </View>
+                        ) : (
+                            <View>
+                                <View style={styles.sheetGrid}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.sheetLabel}>
+                                            Quantity
+                                        </Text>
+                                        <TextInput
+                                            mode="outlined"
+                                            value={qty}
+                                            onChangeText={setQty}
+                                            keyboardType="numeric"
+                                            outlineColor="#E5E7EB"
+                                            activeOutlineColor={
+                                                theme.colors.primary
+                                            }
+                                            style={styles.sheetInput}
+                                        />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.sheetLabel}>
+                                            Unit Cost
+                                        </Text>
+                                        <TextInput
+                                            mode="outlined"
+                                            value={cost}
+                                            onChangeText={setCost}
+                                            keyboardType="numeric"
+                                            outlineColor="#E5E7EB"
+                                            activeOutlineColor={
+                                                theme.colors.primary
+                                            }
+                                            style={styles.sheetInput}
+                                            left={
+                                                <TextInput.Affix text="ETB" />
+                                            }
+                                        />
+                                    </View>
+                                </View>
+
+                                <View>
+                                    <Text style={styles.sheetLabel}>
+                                        Date Received
+                                    </Text>
+                                    <TextInput
+                                        mode="outlined"
+                                        value={dateReceived}
+                                        onChangeText={setDateReceived}
+                                        outlineColor="#E5E7EB"
+                                        activeOutlineColor={
+                                            theme.colors.primary
+                                        }
+                                        style={styles.sheetInput}
+                                        right={
+                                            <TextInput.Icon icon="calendar" />
+                                        }
+                                    />
+                                </View>
+                            </View>
+                        )}
+
+                        <View style={styles.sheetActions}>
+                            <Button
+                                mode="outlined"
+                                style={{ flex: 1 }}
+                                onPress={() => setSheet(null)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                mode="contained"
+                                style={{ flex: 1 }}
+                                onPress={() => setSheet(null)}
+                            >
+                                Save
+                            </Button>
+                        </View>
+                    </Modal>
+                </Portal>
+            </Screen>
+        </>
     );
 };
 
@@ -480,7 +530,8 @@ const getStockStatus = (stock) => {
 const styles = StyleSheet.create({
     container: {
         gap: 16,
-        paddingBottom: 32,
+        backgroundColor: theme.colors.background,
+        paddingTop: 6,
     },
     headerRow: {
         flexDirection: "row",
@@ -576,6 +627,17 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         gap: 12,
     },
+
+    deleteButtonContainer: {
+        marginTop: 12,
+    },
+
+    deleteButton: {
+        backgroundColor: "transparent",
+        color: theme.colors.error,
+        fontWeight: "700",
+    },
+
     sheet: {
         backgroundColor: "#FFFFFF",
         padding: 16,

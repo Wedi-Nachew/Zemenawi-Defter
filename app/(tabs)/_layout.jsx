@@ -1,13 +1,16 @@
-import { Tabs } from "expo-router";
+import { router, Tabs } from "expo-router";
 import { IconButton } from "react-native-paper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TabBarIcon from "../../src/components/TabBarIcon";
 import theme from "../../src/theme";
 
 const TabNaviagtor = () => {
+    const insets = useSafeAreaInsets();
+
     return (
         <Tabs
             screenOptions={{
-                // headerShown: false,
+                headerShown: false,
                 tabBarActiveTintColor: theme.colors.primary,
                 tabBarInactiveTintColor: theme.colors.outline,
                 tabBarStyle: {
@@ -15,8 +18,8 @@ const TabNaviagtor = () => {
                     borderTopWidth: 1,
                     borderTopColor: "#EEEEEE",
                     elevation: 4,
-                    height: 60,
-                    paddingBottom: 8,
+                    height: 60 + insets.bottom,
+                    paddingBottom: 8 + insets.bottom,
                     paddingTop: 8,
                 },
                 tabBarLabelStyle: {
@@ -49,7 +52,7 @@ const TabNaviagtor = () => {
                             mode="contained"
                             containerColor="#E5E7EB"
                             iconColor="#6B7280"
-                            onPress={() => {}}
+                            onPress={() => router.push("/settings")}
                         />
                     ),
                 }}
@@ -104,6 +107,12 @@ const TabNaviagtor = () => {
                             focused={focused}
                         />
                     ),
+                    headerShown: true,
+                    headerTitle: "Profit Analysis",
+                    headerTitleStyle: {
+                        fontSize: 22,
+                        fontWeight: "700",
+                    },
                 }}
             />
         </Tabs>

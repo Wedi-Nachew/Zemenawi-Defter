@@ -3,7 +3,7 @@ import { Stack } from "expo-router";
 const InventoryLayout = () => {
     return (
         <Stack>
-            <Stack.Screen name="index" options={{ title: "Products" }} />
+            <Stack.Screen name="index" />
             <Stack.Screen
                 name="details"
                 options={{ title: "Product Details" }}

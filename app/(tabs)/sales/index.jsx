@@ -1,6 +1,6 @@
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import { useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import {
     Card,
     Chip,
@@ -94,186 +94,211 @@ const SalesScreen = () => {
     }, [filter, query, sections]);
 
     return (
-        <Screen contentContainerStyle={styles.container}>
-            <View style={styles.headerRow}>
-                <Text variant="titleLarge" style={styles.title}>
-                    Sales History
-                </Text>
-                <IconButton
-                    icon="plus"
-                    mode="contained"
-                    containerColor={theme.colors.primary}
-                    iconColor="#FFFFFF"
-                    size={20}
-                    onPress={() => router.push("/(tabs)/sales/new")}
-                />
-            </View>
-
-            <Searchbar
-                value={query}
-                onChangeText={setQuery}
-                placeholder="Search receipt ID or customer..."
-                style={styles.search}
-                inputStyle={{ fontSize: 15 }}
-                iconColor={theme.colors.onSurface}
+        <>
+            <Stack.Screen
+                options={{
+                    headerTitle: "Sales History",
+                    headerTitleStyle: {
+                        fontSize: 22,
+                        fontWeight: "700",
+                    },
+                    headerRight: () => (
+                        <IconButton
+                            icon="plus"
+                            mode="contained"
+                            containerColor={theme.colors.primary}
+                            iconColor="#FFFFFF"
+                            size={22}
+                            onPress={() => router.push("/(tabs)/sales/new")}
+                        />
+                    ),
+                }}
             />
+            <Screen style={styles.container}>
+                <Searchbar
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder="Search by customer..."
+                    style={styles.search}
+                    inputStyle={{ fontSize: 16 }}
+                    iconColor={theme.colors.primary}
+                />
 
-            <View style={styles.filterRow}>
-                <Chip
-                    selected={filter === "all"}
-                    onPress={() => setFilter("all")}
-                    mode={filter === "all" ? "flat" : "outlined"}
-                    selectedColor="#FFFFFF"
-                    textStyle={{
-                        color: filter === "all" ? "#FFFFFF" : theme.colors.text,
-                    }}
-                    style={[
-                        styles.filterChip,
-                        filter === "all" && styles.filterChipActive,
-                    ]}
-                >
-                    All
-                </Chip>
-                <Chip
-                    selected={filter === "cash"}
-                    onPress={() => setFilter("cash")}
-                    mode={filter === "cash" ? "flat" : "outlined"}
-                    selectedColor="#FFFFFF"
-                    textStyle={{
-                        color:
-                            filter === "cash" ? "#FFFFFF" : theme.colors.text,
-                    }}
-                    style={[
-                        styles.filterChip,
-                        filter === "cash" && styles.filterChipActive,
-                    ]}
-                >
-                    Cash
-                </Chip>
-                <Chip
-                    selected={filter === "credit"}
-                    onPress={() => setFilter("credit")}
-                    mode={filter === "credit" ? "flat" : "outlined"}
-                    selectedColor="#FFFFFF"
-                    textStyle={{
-                        color:
-                            filter === "credit" ? "#FFFFFF" : theme.colors.text,
-                    }}
-                    style={[
-                        styles.filterChip,
-                        filter === "credit" && styles.filterChipActive,
-                    ]}
-                >
-                    Credit
-                </Chip>
-                <Chip
-                    selected={filter === "partial"}
-                    onPress={() => setFilter("partial")}
-                    mode={filter === "partial" ? "flat" : "outlined"}
-                    selectedColor="#FFFFFF"
-                    textStyle={{
-                        color:
-                            filter === "partial"
-                                ? "#FFFFFF"
-                                : theme.colors.text,
-                    }}
-                    style={[
-                        styles.filterChip,
-                        filter === "partial" && styles.filterChipActive,
-                    ]}
-                >
-                    Partial
-                </Chip>
-            </View>
+                <View style={styles.filterRow}>
+                    <Chip
+                        selected={filter === "all"}
+                        onPress={() => setFilter("all")}
+                        mode={filter === "all" ? "flat" : "outlined"}
+                        selectedColor="#FFFFFF"
+                        textStyle={{
+                            color:
+                                filter === "all"
+                                    ? "#FFFFFF"
+                                    : theme.colors.text,
+                        }}
+                        style={[
+                            styles.filterChip,
+                            filter === "all" && styles.filterChipActive,
+                        ]}
+                    >
+                        All
+                    </Chip>
+                    <Chip
+                        selected={filter === "cash"}
+                        onPress={() => setFilter("cash")}
+                        mode={filter === "cash" ? "flat" : "outlined"}
+                        selectedColor="#FFFFFF"
+                        textStyle={{
+                            color:
+                                filter === "cash"
+                                    ? "#FFFFFF"
+                                    : theme.colors.text,
+                        }}
+                        style={[
+                            styles.filterChip,
+                            filter === "cash" && styles.filterChipActive,
+                        ]}
+                    >
+                        Cash
+                    </Chip>
+                    <Chip
+                        selected={filter === "credit"}
+                        onPress={() => setFilter("credit")}
+                        mode={filter === "credit" ? "flat" : "outlined"}
+                        selectedColor="#FFFFFF"
+                        textStyle={{
+                            color:
+                                filter === "credit"
+                                    ? "#FFFFFF"
+                                    : theme.colors.text,
+                        }}
+                        style={[
+                            styles.filterChip,
+                            filter === "credit" && styles.filterChipActive,
+                        ]}
+                    >
+                        Credit
+                    </Chip>
+                    <Chip
+                        selected={filter === "partial"}
+                        onPress={() => setFilter("partial")}
+                        mode={filter === "partial" ? "flat" : "outlined"}
+                        selectedColor="#FFFFFF"
+                        textStyle={{
+                            color:
+                                filter === "partial"
+                                    ? "#FFFFFF"
+                                    : theme.colors.text,
+                        }}
+                        style={[
+                            styles.filterChip,
+                            filter === "partial" && styles.filterChipActive,
+                        ]}
+                    >
+                        Partial
+                    </Chip>
+                </View>
 
-            {filteredSections.map((section) => (
-                <View key={section.title} style={{ gap: 12 }}>
-                    <Text style={styles.sectionTitle}>{section.title}</Text>
-                    {section.items.map((item) => {
-                        const status = getStatusTone(item.status);
-                        return (
-                            <Card
-                                key={item.id}
-                                style={styles.card}
-                                onPress={() =>
-                                    router.push({
-                                        pathname: "/(tabs)/sales/details",
-                                        params: { id: item.id },
-                                    })
-                                }
-                            >
-                                <Card.Content style={styles.cardRow}>
-                                    <View
-                                        style={[
-                                            styles.avatar,
-                                            { backgroundColor: status.iconBg },
-                                        ]}
+                <ScrollView>
+                    {filteredSections.map((section) => (
+                        <View key={section.title} style={{ gap: 12 }}>
+                            <Text style={styles.sectionTitle}>
+                                {section.title}
+                            </Text>
+                            {section.items.map((item) => {
+                                const status = getStatusTone(item.status);
+                                return (
+                                    <Card
+                                        key={item.id}
+                                        style={styles.card}
+                                        onPress={() =>
+                                            router.push({
+                                                pathname:
+                                                    "/(tabs)/sales/details",
+                                                params: { id: item.id },
+                                            })
+                                        }
                                     >
-                                        <Icon
-                                            source={status.icon}
-                                            color={status.iconColor}
-                                            size={18}
-                                        />
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.cardTitle}>
-                                            {item.customer}
-                                        </Text>
-                                        <Text style={styles.meta}>
-                                            {item.receipt} • {item.time}
-                                        </Text>
-                                    </View>
-                                    <View
-                                        style={{
-                                            alignItems: "flex-end",
-                                            gap: 6,
-                                        }}
-                                    >
-                                        <Text style={styles.amount}>
-                                            {item.amount.toLocaleString()} ETB
-                                        </Text>
-                                        <Text
-                                            style={
-                                                item.profit >= 0
-                                                    ? styles.profit
-                                                    : styles.loss
-                                            }
-                                        >
-                                            {item.profit >= 0
-                                                ? `Profit ETB ${item.profit.toLocaleString()}`
-                                                : `Loss ETB ${Math.abs(item.profit).toLocaleString()}`}
-                                        </Text>
-                                        <View
-                                            style={[
-                                                styles.statusPill,
-                                                {
-                                                    backgroundColor:
-                                                        status.pillBg,
-                                                },
-                                            ]}
-                                        >
-                                            <Text
+                                        <Card.Content style={styles.cardRow}>
+                                            <View
                                                 style={[
-                                                    styles.statusText,
-                                                    { color: status.pillText },
+                                                    styles.avatar,
+                                                    {
+                                                        backgroundColor:
+                                                            status.iconBg,
+                                                    },
                                                 ]}
                                             >
-                                                {item.tag}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <Icon
-                                        source="chevron-right"
-                                        color={theme.colors.onSurface}
-                                        size={20}
-                                    />
-                                </Card.Content>
-                            </Card>
-                        );
-                    })}
-                </View>
-            ))}
-        </Screen>
+                                                <Icon
+                                                    source={status.icon}
+                                                    color={status.iconColor}
+                                                    size={18}
+                                                />
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.cardTitle}>
+                                                    {item.customer}
+                                                </Text>
+                                                <Text style={styles.meta}>
+                                                    {item.receipt} • {item.time}
+                                                </Text>
+                                            </View>
+                                            <View
+                                                style={{
+                                                    alignItems: "flex-end",
+                                                    gap: 6,
+                                                }}
+                                            >
+                                                <Text style={styles.amount}>
+                                                    {item.amount.toLocaleString()}{" "}
+                                                    ETB
+                                                </Text>
+                                                <Text
+                                                    style={
+                                                        item.profit >= 0
+                                                            ? styles.profit
+                                                            : styles.loss
+                                                    }
+                                                >
+                                                    {item.profit >= 0
+                                                        ? `Profit ETB ${item.profit.toLocaleString()}`
+                                                        : `Loss ETB ${Math.abs(item.profit).toLocaleString()}`}
+                                                </Text>
+                                                <View
+                                                    style={[
+                                                        styles.statusPill,
+                                                        {
+                                                            backgroundColor:
+                                                                status.pillBg,
+                                                        },
+                                                    ]}
+                                                >
+                                                    <Text
+                                                        style={[
+                                                            styles.statusText,
+                                                            {
+                                                                color: status.pillText,
+                                                            },
+                                                        ]}
+                                                    >
+                                                        {item.tag}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                            <Icon
+                                                source="chevron-right"
+                                                color={theme.colors.onSurface}
+                                                size={20}
+                                            />
+                                        </Card.Content>
+                                    </Card>
+                                );
+                            })}
+                        </View>
+                    ))}
+                </ScrollView>
+            </Screen>
+        </>
     );
 };
 // },
@@ -320,7 +345,12 @@ const styles = StyleSheet.create({
         fontWeight: "700",
     },
     search: {
-        borderRadius: theme.roundness,
+        borderRadius: 24,
+        backgroundColor: theme.colors.surface,
+        elevation: 3,
+        borderWidth: 1,
+        borderColor: "#E2E8F0",
+        marginTop: 2,
     },
     filterRow: {
         flexDirection: "row",
@@ -335,7 +365,7 @@ const styles = StyleSheet.create({
     sectionTitle: {
         color: theme.colors.onSurface,
         fontWeight: "600",
-        marginTop: 8,
+        marginTop: 10,
     },
     card: {
         backgroundColor: theme.colors.surface,
