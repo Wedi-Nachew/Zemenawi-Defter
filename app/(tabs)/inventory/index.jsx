@@ -1,5 +1,5 @@
 import { router, Stack } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { FlatList, StyleSheet, View } from "react-native";
 import {
     Card,
@@ -11,91 +11,41 @@ import {
     Text,
 } from "react-native-paper";
 import Screen from "../../../src/components/Screen";
+import { getProducts } from "../../../src/services/productService";
 import theme from "../../../src/theme";
 
 const ProductsScreen = () => {
-    const products = useMemo(
-        () => [
-            {
-                id: "p1",
-                name: "Harar Coffee",
-                unit: "kg",
-                price: 650,
-                stock: 18,
-            },
-            {
-                id: "p2",
-                name: "Flour (25kg)",
-                unit: "bag",
-                price: 1550,
-                stock: 1,
-            },
-            {
-                id: "p3",
-                name: "Mineral Water",
-                unit: "crate",
-                price: 300,
-                stock: 5,
-            },
-            {
-                id: "p4",
-                name: "Sunflower Oil",
-                unit: "liter",
-                price: 180,
-                stock: 0,
-            },
-            {
-                id: "p5",
-                name: "Sugar (50kg)",
-                unit: "bag",
-                price: 2800,
-                stock: 12,
-            },
-            {
-                id: "p6",
-                name: "Salt (25kg)",
-                unit: "bag",
-                price: 900,
-                stock: 0,
-            },
-            {
-                id: "p7",
-                name: "Eggs (30pcs)",
-                unit: "carton",
-                price: 220,
-                stock: 8,
-            },
-            {
-                id: "p8",
-                name: "Butter",
-                unit: "kg",
-                price: 450,
-                stock: 3,
-            },
-            {
-                id: "p9",
-                name: "Cheese",
-                unit: "kg",
-                price: 550,
-                stock: 0,
-            },
-        ],
-        [],
-    );
+    const [products, setProducts] = useState([]);
+    const [loading, setLoading] = useState(false);
 
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState("all");
 
-    const filtered = useMemo(() => {
-        const q = query.trim().toLowerCase();
-        let list = products.filter((p) =>
-            q ? p.name.toLowerCase().includes(q) : true,
-        );
-        if (filter === "low")
-            list = list.filter((p) => p.stock > 0 && p.stock <= 5);
-        if (filter === "out") list = list.filter((p) => p.stock === 0);
-        return list;
-    }, [products, query, filter]);
+    useEffect(() => {
+        let active = true;
+
+        const loadProducts = async () => {
+            setLoading(true);
+            try {
+                const result = await getProducts({
+                    search: query.trim(),
+                    filter,
+                });
+                if (!active) return;
+                setProducts(result);
+            } catch (error) {
+                console.error("Failed to load products", error);
+            } finally {
+                if (active) setLoading(false);
+            }
+        };
+
+        loadProducts();
+
+        return () => {
+            active = false;
+        };
+    }, [query, filter]);
 
     const renderItem = ({ item }) => {
         const status = getStockStatus(item.stock);
@@ -127,7 +77,8 @@ const ProductsScreen = () => {
                             {item.name}
                         </Text>
                         <Text style={styles.meta}>
-                            ETB {item.price.toLocaleString()} / {item.unit}
+                            ETB {item.defaultSellingPrice.toLocaleString()} /{" "}
+                            {item.unit}
                         </Text>
                     </View>
                     <View
@@ -247,7 +198,7 @@ const ProductsScreen = () => {
                 <Divider style={styles.divider} />
 
                 <FlatList
-                    data={filtered}
+                    data={products}
                     keyExtractor={(item) => item.id}
                     renderItem={renderItem}
                     ItemSeparatorComponent={() => (
@@ -255,6 +206,25 @@ const ProductsScreen = () => {
                     )}
                     contentContainerStyle={{ paddingBottom: 72 }}
                     showsVerticalScrollIndicator={false}
+                    ListEmptyComponent={
+                        loading ? (
+                            <View style={styles.emptyState}>
+                                <Text style={styles.emptyTitle}>Loading…</Text>
+                                <Text style={styles.emptySubtitle}>
+                                    Fetching inventory items.
+                                </Text>
+                            </View>
+                        ) : (
+                            <View style={styles.emptyState}>
+                                <Text style={styles.emptyTitle}>
+                                    No products found
+                                </Text>
+                                <Text style={styles.emptySubtitle}>
+                                    Add products or adjust your search.
+                                </Text>
+                            </View>
+                        )
+                    }
                 />
             </Screen>
         </>
@@ -371,6 +341,23 @@ const styles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 8,
+    },
+    emptyState: {
+        backgroundColor: theme.colors.surface,
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: "#EEF0F4",
+    },
+    emptyTitle: {
+        color: theme.colors.text,
+        fontWeight: "700",
+        fontSize: 14,
+    },
+    emptySubtitle: {
+        color: theme.colors.onSurface,
+        marginTop: 4,
+        fontSize: 12,
     },
 });
 
