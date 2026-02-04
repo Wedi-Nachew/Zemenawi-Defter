@@ -1,10 +1,12 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
 import {
+    ActivityIndicator,
     Button,
     Card,
     Chip,
+    Dialog,
     Divider,
     Icon,
     IconButton,
@@ -14,79 +16,20 @@ import {
     TextInput,
 } from "react-native-paper";
 import Screen from "../../../src/components/Screen";
+import {
+    deleteProduct,
+    getProductBatches,
+    getProductById,
+} from "../../../src/services/productService";
 import theme from "../../../src/theme";
-
-const catalog = {
-    p1: {
-        id: "p1",
-        name: "Harar Coffee",
-        unit: "kg",
-        price: 650,
-        stock: 18,
-        batches: [
-            {
-                id: "b1",
-                date: "Jan 18, 2026",
-                purchasePrice: 420,
-                remaining: 5,
-            },
-            {
-                id: "b2",
-                date: "Jan 05, 2026",
-                purchasePrice: 400,
-                remaining: 13,
-            },
-        ],
-    },
-    p2: {
-        id: "p2",
-        name: "Flour (25kg)",
-        unit: "bag",
-        price: 1550,
-        stock: 1,
-        batches: [
-            {
-                id: "b3",
-                date: "Jan 12, 2026",
-                purchasePrice: 1200,
-                remaining: 1,
-            },
-        ],
-    },
-    p3: {
-        id: "p3",
-        name: "Mineral Water",
-        unit: "crate",
-        price: 300,
-        stock: 5,
-        batches: [
-            {
-                id: "b4",
-                date: "Jan 10, 2026",
-                purchasePrice: 180,
-                remaining: 5,
-            },
-        ],
-    },
-    p4: {
-        id: "p4",
-        name: "Sunflower Oil",
-        unit: "liter",
-        price: 180,
-        stock: 0,
-        batches: [
-            {
-                id: "b5",
-                date: "Dec 29, 2025",
-                purchasePrice: 130,
-                remaining: 0,
-            },
-        ],
-    },
-};
 
 const ProductDetails = () => {
     const { id } = useLocalSearchParams();
+    const [product, setProduct] = useState(null);
+    const [batches, setBatches] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [deleting, setDeleting] = useState(false);
     const [sheet, setSheet] = useState(null);
     const [selectedBatch, setSelectedBatch] = useState(null);
     const [qty, setQty] = useState("1");
@@ -96,36 +39,89 @@ const ProductDetails = () => {
     const [productUnit, setProductUnit] = useState("");
     const [productPrice, setProductPrice] = useState("");
 
-    const product = useMemo(
-        () => (typeof id === "string" ? catalog[id] : undefined),
-        [id],
+    useEffect(() => {
+        let active = true;
+
+        const loadProductDetails = async () => {
+            if (typeof id !== "string") return;
+            setLoading(true);
+            try {
+                const result = await getProductById(id);
+                const batchRows = await getProductBatches(id);
+                if (!active) return;
+                setProduct(result);
+                setBatches(batchRows);
+            } catch (error) {
+                console.error("Failed to load product details", error);
+            } finally {
+                if (active) setLoading(false);
+            }
+        };
+
+        loadProductDetails();
+
+        return () => {
+            active = false;
+        };
+    }, [id]);
+
+    const displayBatches = useMemo(
+        () =>
+            batches.map((batch) => ({
+                id: batch.id,
+                remaining: batch.remainingQuantity ?? 0,
+                purchasePrice: batch.purchasePrice ?? 0,
+                date: batch.purchasedAt
+                    ? new Date(batch.purchasedAt).toLocaleDateString()
+                    : "",
+            })),
+        [batches],
     );
 
     if (!product) {
         return (
-            <Screen contentContainerStyle={styles.container}>
-                <View style={styles.headerRow}>
-                    <IconButton
-                        icon="arrow-left"
-                        onPress={() => router.back()}
-                    />
-                    <Text variant="titleMedium" style={styles.title}>
-                        Product Details
-                    </Text>
-                    <View style={{ width: 40 }} />
-                </View>
-                <Card style={styles.card}>
-                    <Card.Content style={{ gap: 8 }}>
-                        <Text style={styles.title}>Product not found</Text>
-                        <Text style={styles.meta}>
-                            Select a product from the list to view its details.
-                        </Text>
-                        <Button mode="contained" onPress={() => router.back()}>
-                            Back to list
-                        </Button>
-                    </Card.Content>
-                </Card>
-            </Screen>
+            <>
+                <Stack.Screen
+                    options={{
+                        headerTitle: "Product Details",
+                        headerTitleStyle: {
+                            fontWeight: "700",
+                            fontSize: 20,
+                        },
+                        headerTitleAlign: "center",
+                    }}
+                />
+                <Screen style={styles.container}>
+                    <Card style={styles.card}>
+                        <Card.Content style={{ gap: 8, alignItems: "center" }}>
+                            <Text style={styles.title}>
+                                {loading
+                                    ? "Loading product…"
+                                    : "Product not found"}
+                            </Text>
+                            <Text style={styles.meta}>
+                                {loading
+                                    ? "Fetching product details."
+                                    : "Select a product from the list to view its details."}
+                            </Text>
+                            {loading && (
+                                <ActivityIndicator
+                                    style={{ marginTop: 8 }}
+                                    animating
+                                />
+                            )}
+                            {!loading && (
+                                <Button
+                                    mode="contained"
+                                    onPress={() => router.back()}
+                                >
+                                    Back to list
+                                </Button>
+                            )}
+                        </Card.Content>
+                    </Card>
+                </Screen>
+            </>
         );
     }
 
@@ -148,13 +144,28 @@ const ProductDetails = () => {
     };
 
     const openDeleteProductConfirmation = () => {
-        setSheet("delete-confimartion");
+        setDeleteDialogOpen(true);
+    };
+
+    const handleDeleteProduct = async () => {
+        if (!product) return;
+        setDeleting(true);
+        if (product.stock > 0) return;
+        try {
+            await deleteProduct(product);
+            setDeleteDialogOpen(false);
+            router.back();
+        } catch (error) {
+            console.error("Failed to delete product", error);
+        } finally {
+            setDeleting(false);
+        }
     };
 
     const openEditProduct = () => {
         setProductName(product.name);
         setProductUnit(product.unit);
-        setProductPrice(String(product.price));
+        setProductPrice(String(product.defaultSellingPrice));
         setSheet("edit-product");
     };
 
@@ -222,7 +233,8 @@ const ProductDetails = () => {
                                     Selling Price
                                 </Text>
                                 <Text style={styles.priceValue}>
-                                    ETB {product.price.toLocaleString()}
+                                    ETB{" "}
+                                    {product.defaultSellingPrice.toLocaleString()}
                                 </Text>
                             </View>
                         </Card.Content>
@@ -256,7 +268,7 @@ const ProductDetails = () => {
                             />
                             <InfoCell
                                 label="Unit Price"
-                                value={`ETB ${product.price.toLocaleString()}`}
+                                value={`ETB ${product.defaultSellingPrice.toLocaleString()}`}
                             />
                             <InfoCell
                                 label="SKU"
@@ -279,38 +291,57 @@ const ProductDetails = () => {
                                     Batch History
                                 </Text>
                             </View>
-                            {product.batches.map((batch, idx) => (
-                                <View
-                                    key={batch.id}
-                                    style={{ paddingVertical: 6 }}
-                                >
-                                    <View style={styles.batchRow}>
-                                        <View>
-                                            <Text style={styles.title}>
-                                                {batch.date}
-                                            </Text>
-                                            <Text style={styles.meta}>
-                                                {batch.remaining} left
-                                            </Text>
-                                        </View>
-                                        <Button
-                                            mode="outlined"
-                                            compact
-                                            icon="pencil"
-                                            onPress={() => openEditBatch(batch)}
-                                        >
-                                            Edit Stock
-                                        </Button>
-                                    </View>
+                            {loading ? (
+                                <View style={styles.emptyBatch}>
+                                    <ActivityIndicator animating />
                                     <Text style={styles.meta}>
-                                        Purchase ETB{" "}
-                                        {batch.purchasePrice.toLocaleString()}
+                                        Loading batch history…
                                     </Text>
-                                    {idx < product.batches.length - 1 && (
-                                        <Divider style={{ marginTop: 10 }} />
-                                    )}
                                 </View>
-                            ))}
+                            ) : displayBatches.length === 0 ? (
+                                <View style={styles.emptyBatch}>
+                                    <Text style={styles.meta}>
+                                        No batches recorded.
+                                    </Text>
+                                </View>
+                            ) : (
+                                displayBatches.map((batch, idx) => (
+                                    <View
+                                        key={batch.id}
+                                        style={{ paddingVertical: 6 }}
+                                    >
+                                        <View style={styles.batchRow}>
+                                            <View>
+                                                <Text style={styles.title}>
+                                                    {batch.date}
+                                                </Text>
+                                                <Text style={styles.meta}>
+                                                    {batch.remaining} left
+                                                </Text>
+                                            </View>
+                                            <Button
+                                                mode="outlined"
+                                                compact
+                                                icon="pencil"
+                                                onPress={() =>
+                                                    openEditBatch(batch)
+                                                }
+                                            >
+                                                Edit Stock
+                                            </Button>
+                                        </View>
+                                        <Text style={styles.meta}>
+                                            Purchase ETB{" "}
+                                            {batch.purchasePrice.toLocaleString()}
+                                        </Text>
+                                        {idx < displayBatches.length - 1 && (
+                                            <Divider
+                                                style={{ marginTop: 10 }}
+                                            />
+                                        )}
+                                    </View>
+                                ))
+                            )}
                         </Card.Content>
                     </Card>
                 </ScrollView>
@@ -324,12 +355,72 @@ const ProductDetails = () => {
                             color: theme.colors.error,
                             fontWeight: "bold",
                         }}
-                        onPress={() => Alert.alert("deleting")}
+                        onPress={openDeleteProductConfirmation}
                     >
                         Delete Product
                     </Button>
                 </View>
                 <Portal>
+                    <Dialog
+                        visible={deleteDialogOpen}
+                        onDismiss={() => setDeleteDialogOpen(false)}
+                        style={styles.dialog}
+                    >
+                        <Dialog.Title style={styles.dialogTitle}>
+                            Delete product?
+                        </Dialog.Title>
+                        <Dialog.Content>
+                            <Text style={styles.meta}>
+                                This action can’t be undone. The product will be
+                                removed if there is no remaining stock.
+                            </Text>
+                        </Dialog.Content>
+                        <Dialog.Actions>
+                            <Button
+                                mode="text"
+                                onPress={() => setDeleteDialogOpen(false)}
+                                disabled={deleting}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                mode="contained"
+                                buttonColor={theme.colors.error}
+                                onPress={handleDeleteProduct}
+                                loading={deleting}
+                                disabled={deleting}
+                            >
+                                Delete
+                            </Button>
+                        </Dialog.Actions>
+                    </Dialog>
+                    <Dialog
+                        visible={deleting && product.stock > 0}
+                        onDismiss={() => setDeleting(false)}
+                        style={styles.dialog}
+                    >
+                        <Dialog.Title style={styles.dialogTitle}>
+                            Cannot delete product
+                        </Dialog.Title>
+                        <Dialog.Content>
+                            <Text style={styles.meta}>
+                                You cannot delete a product that has remaining
+                                stock. Please reduce the stock to zero before
+                                deleting.
+                            </Text>
+                        </Dialog.Content>
+                        <Dialog.Actions>
+                            <Button
+                                mode="contained"
+                                onPress={() => {
+                                    setDeleting(false);
+                                    setDeleteDialogOpen(false);
+                                }}
+                            >
+                                OK
+                            </Button>
+                        </Dialog.Actions>
+                    </Dialog>
                     <Modal
                         visible={!!sheet}
                         onDismiss={() => setSheet(null)}
@@ -545,6 +636,11 @@ const styles = StyleSheet.create({
     meta: {
         color: theme.colors.onSurface,
     },
+    card: {
+        backgroundColor: theme.colors.surface,
+        borderRadius: 16,
+        elevation: 0,
+    },
     heroCard: {
         backgroundColor: theme.colors.surface,
         borderRadius: 16,
@@ -623,6 +719,11 @@ const styles = StyleSheet.create({
         alignItems: "center",
         marginBottom: 4,
     },
+    emptyBatch: {
+        paddingVertical: 8,
+        alignItems: "center",
+        gap: 8,
+    },
     actionsRow: {
         flexDirection: "row",
         gap: 12,
@@ -635,6 +736,14 @@ const styles = StyleSheet.create({
     deleteButton: {
         backgroundColor: "transparent",
         color: theme.colors.error,
+        fontWeight: "700",
+    },
+    dialog: {
+        backgroundColor: theme.colors.surface,
+        borderRadius: 16,
+    },
+    dialogTitle: {
+        color: theme.colors.text,
         fontWeight: "700",
     },
 
