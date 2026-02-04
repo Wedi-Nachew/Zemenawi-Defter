@@ -1,9 +1,11 @@
+import { Q } from "@nozbe/watermelondb";
 import database from "../database";
 
 const creditPaymentsCollection = database.collections.get("credit_payments");
 const creditPaymentItemsCollection = database.collections.get(
     "credit_payment_items",
 );
+const customerCollection = database.collections.get("customers");
 
 /**
  * Pay toward specific credit sale items
@@ -154,11 +156,65 @@ const payGenericFIFO = async (customer, amount, paidAt = Date.now()) => {
     return await payTowardSaleItems(customer, allocations, paidAt);
 };
 
+const getCustomersQuery = () => {
+    return customerCollection.query(Q.sortBy("name", Q.asc));
+};
+
+const getCustomersWithBalances = async ({
+    search = "",
+    filter = "all",
+} = {}) => {
+    const customers = await getCustomersQuery().fetch();
+    const normalized = search.trim().toLowerCase();
+    const results = [];
+
+    for (const customer of customers) {
+        if (normalized) {
+            const matchesName = customer.name
+                ?.toLowerCase()
+                .includes(normalized);
+            const matchesPhone = customer.phone?.includes(normalized);
+            if (!matchesName && !matchesPhone) continue;
+        }
+
+        const balance = await getCustomerTotalCreditBalance(customer);
+
+        if (filter === "balance" && balance <= 0) continue;
+        if (filter === "paid" && balance > 0) continue;
+
+        results.push({ customer, balance });
+    }
+
+    return results;
+};
+
+const getCustomerById = async (id) => {
+    return await customerCollection.find(id);
+};
+
+const getCustomerPayments = async (customerId, limit = 20) => {
+    return await creditPaymentsCollection
+        .query(
+            Q.where("customer_id", customerId),
+            Q.sortBy("paid_at", Q.desc),
+            Q.take(limit),
+        )
+        .fetch();
+};
+
+const getCustomerUnpaidItems = async (customer) => {
+    return await getUnpaidSaleItemsFIFO(customer);
+};
+
 export {
+    getCustomerById,
+    getCustomerPayments,
+    getCustomersQuery,
+    getCustomersWithBalances,
     getCustomerTotalCreditBalance,
+    getCustomerUnpaidItems,
     getSaleItemRemainingBalance,
     getUnpaidSaleItemsFIFO,
     payGenericFIFO,
-    payTowardSaleItems
+    payTowardSaleItems,
 };
-

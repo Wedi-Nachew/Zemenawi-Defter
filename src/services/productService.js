@@ -1,3 +1,4 @@
+import { Q } from "@nozbe/watermelondb";
 import database from "../database";
 
 const productCollection = database.collections.get("products");
@@ -57,4 +58,50 @@ const getAllProducts = async () => {
     return await productCollection.query();
 };
 
-export { createProduct, deleteProduct, getAllProducts, updateProduct };
+// Query helpers
+const getProductsQuery = ({ search = "", filter = "all" } = {}) => {
+    const clauses = [];
+
+    if (search) {
+        clauses.push(Q.where("name", Q.like(`%${search}%`)));
+    }
+
+    if (filter === "low") {
+        clauses.push(Q.where("stock", Q.lte(5)), Q.where("stock", Q.gt(0)));
+    }
+
+    if (filter === "out") {
+        clauses.push(Q.where("stock", Q.eq(0)));
+    }
+
+    return productCollection.query(...clauses);
+};
+
+const getProducts = async (options = {}) => {
+    return await getProductsQuery(options).fetch();
+};
+
+const getProductById = async (id) => {
+    return await productCollection.find(id);
+};
+
+const getProductBatches = async (productId) => {
+    return await database.collections
+        .get("product_batches")
+        .query(
+            Q.where("product_id", productId),
+            Q.sortBy("purchased_at", Q.desc),
+        )
+        .fetch();
+};
+
+export {
+    createProduct,
+    deleteProduct,
+    getAllProducts,
+    getProductBatches,
+    getProductById,
+    getProducts,
+    getProductsQuery,
+    updateProduct,
+};

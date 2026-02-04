@@ -1,3 +1,4 @@
+import { Q } from "@nozbe/watermelondb";
 import database from "../database";
 import { payGenericFIFO } from "./creditService";
 import { consumeStockFIFO } from "./inventoryService";
@@ -116,4 +117,63 @@ const createSale = async (
     return sale;
 };
 
-export { createSale };
+const getSalesQuery = ({ type = "all", startDate, endDate } = {}) => {
+    const clauses = [];
+
+    if (type === "cash" || type === "credit") {
+        clauses.push(Q.where("type", type));
+    }
+
+    if (startDate !== undefined) {
+        clauses.push(Q.where("sold_at", Q.gte(startDate)));
+    }
+
+    if (endDate !== undefined) {
+        clauses.push(Q.where("sold_at", Q.lte(endDate)));
+    }
+
+    return saleCollection.query(...clauses, Q.sortBy("sold_at", Q.desc));
+};
+
+const getSales = async ({ search = "", ...options } = {}) => {
+    const sales = await getSalesQuery(options).fetch();
+    if (!search) return sales;
+
+    const normalized = search.trim().toLowerCase();
+    const filtered = [];
+    for (const sale of sales) {
+        if (!sale.customerId) {
+            filtered.push(sale);
+            continue;
+        }
+        const customer = await sale.customer.fetch();
+        if (customer?.name?.toLowerCase().includes(normalized)) {
+            filtered.push(sale);
+        }
+    }
+
+    return filtered;
+};
+
+const getRecentSales = async (limit = 5) => {
+    return await saleCollection
+        .query(Q.sortBy("sold_at", Q.desc), Q.take(limit))
+        .fetch();
+};
+
+const getSaleById = async (id) => {
+    return await saleCollection.find(id);
+};
+
+const getSaleItems = async (saleId) => {
+    return await saleItemCollection.query(Q.where("sale_id", saleId)).fetch();
+};
+
+export {
+    createSale,
+    getRecentSales,
+    getSaleById,
+    getSaleItems,
+    getSales,
+    getSalesQuery,
+};

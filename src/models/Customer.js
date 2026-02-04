@@ -9,6 +9,11 @@ import {
 class Customer extends Model {
     static table = "customers";
 
+    static associations = {
+        sales: { type: "has_many", foreignKey: "customer_id" },
+        credit_payments: { type: "has_many", foreignKey: "customer_id" },
+    };
+
     @field("name") name;
     @field("phone") phone;
     @readonly @date("created_at") createdAt;

@@ -1,9 +1,11 @@
+import { Q } from "@nozbe/watermelondb";
 import database from "../database";
 
 const saleItemCollection = database.collections.get("sale_items");
 const productCollection = database.collections.get("products");
 const salesCollection = database.collections.get("sales");
 const customerCollection = database.collections.get("customers");
+const creditPaymentsCollection = database.collections.get("credit_payments");
 
 // Get total profit per product
 const getProfitPerProduct = async () => {
@@ -108,11 +110,94 @@ const getTopSellingProducts = async (limit = 10) => {
     return productSales.slice(0, limit);
 };
 
-export {
-    getCustomerOutstandingBalances,
-    getLowStockProducts,
-    getProfitByDateRange,
-    getProfitPerProduct,
-    getTopSellingProducts
+const getTodaySalesTotal = async (todayStart, todayEnd) => {
+    const sales = await salesCollection
+        .query(
+            Q.where("sold_at", Q.gte(todayStart)),
+            Q.where("sold_at", Q.lte(todayEnd)),
+        )
+        .fetch();
+
+    let total = 0;
+    for (const sale of sales) {
+        const items = await sale.saleItems.fetch();
+        total += items.reduce(
+            (sum, item) => sum + item.quantity * item.sellingPrice,
+            0,
+        );
+    }
+    return total;
 };
 
+const getOutstandingCreditTotal = async () => {
+    const customers = await customerCollection.query().fetch();
+    let total = 0;
+    for (const customer of customers) {
+        total += await getSaleItemRemainingBalanceForCustomer(customer);
+    }
+    return total;
+};
+
+const getRecentSales = async (limit = 5) => {
+    return await salesCollection
+        .query(Q.sortBy("sold_at", Q.desc), Q.take(limit))
+        .fetch();
+};
+
+const getCustomerPayments = async (customerId, limit = 20) => {
+    return await creditPaymentsCollection
+        .query(
+            Q.where("customer_id", customerId),
+            Q.sortBy("paid_at", Q.desc),
+            Q.take(limit),
+        )
+        .fetch();
+};
+
+const getDashboardSummary = async ({
+    lowStockThreshold = 5,
+    recentLimit = 5,
+} = {}) => {
+    const products = await productCollection.query().fetch();
+    const totalProducts = products.length;
+
+    const lowStockProducts = products.filter(
+        (p) => p.stock <= lowStockThreshold,
+    );
+
+    const now = Date.now();
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const todaySalesTotal = await getTodaySalesTotal(
+        startOfToday.getTime(),
+        endOfToday.getTime(),
+    );
+
+    const outstandingCredit = await getOutstandingCreditTotal();
+    const recentSales = await getRecentSales(recentLimit);
+
+    return {
+        totalProducts,
+        todaySalesTotal,
+        outstandingCredit,
+        lowStockProducts,
+        recentSales,
+        now,
+    };
+};
+
+export {
+    getCustomerOutstandingBalances,
+    getCustomerPayments,
+    getDashboardSummary,
+    getLowStockProducts,
+    getOutstandingCreditTotal,
+    getProfitByDateRange,
+    getProfitPerProduct,
+    getRecentSales,
+    getTodaySalesTotal,
+    getTopSellingProducts,
+};

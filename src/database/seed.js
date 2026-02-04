@@ -1,176 +1,166 @@
-import database from "./index";
+const seedDB = async (database) => {
+    const productsCollection = database.collections.get("products");
+    const batchesCollection = database.collections.get("product_batches");
+    const customersCollection = database.collections.get("customers");
+    const salesCollection = database.collections.get("sales");
+    const saleItemsCollection = database.collections.get("sale_items");
+    const creditPaymentsCollection =
+        database.collections.get("credit_payments");
+    const creditPaymentItemsCollection = database.collections.get(
+        "credit_payment_items",
+    );
 
-const seedDB = async () => {
-    const now = new Date();
+    // const existingProducts = await productsCollection.query().fetch();
+    // if (existingProducts.length > 0) {
+    //     console.log("Database already seeded");
+    //     return;
+    // }
+
+    const now = Date.now();
 
     await database.write(async () => {
-        console.log("Seeding database...");
-
-        const customers = database.collections.get("customers");
-        const products = database.collections.get("products");
-        const batches = database.collections.get("product_batches");
-        const sales = database.collections.get("sales");
-        const saleItems = database.collections.get("sale_items");
-        const payments = database.collections.get("credit_payments");
-        const paymentItems = database.collections.get("credit_payment_items");
-
-        // Customers
-        const customer1 = await customers.create((cust) => {
-            cust.name = "Abel Tadesse";
-            cust.phone = "0912345678";
-            cust.created_at = now;
-            cust.updated_at = now;
+        // reset database
+        await database.unsafeResetDatabase();
+        /* ------------------ PRODUCTS ------------------ */
+        const teff = await productsCollection.create((p) => {
+            p.name = "Teff Flour";
+            p.unit = "quintal";
+            p.stock = 3;
+            p.default_selling_price = 7800;
+            p.created_at = now;
+            p.updated_at = now;
         });
 
-        const customer2 = await customers.create((cust) => {
-            cust.name = "Mulugeta Kebede";
-            cust.phone = "0987654321";
-            cust.created_at = now;
-            cust.updated_at = now;
-        });
-
-        // Products
-        // ======================
-        // Products
-        // ======================
-        const sugar = await products.create((p) => {
+        const sugar = await productsCollection.create((p) => {
             p.name = "Sugar";
+            p.unit = "kg";
+            p.stock = 42;
             p.default_selling_price = 65;
-            p.stock = 150;
-            p.unit = "kg";
             p.created_at = now;
             p.updated_at = now;
         });
 
-        const rice = await products.create((p) => {
-            p.name = "Rice";
-            p.default_selling_price = 80;
-            p.stock = 120;
-            p.unit = "kg";
-            p.created_at = now;
-            p.updated_at = now;
-        });
-
-        const oil = await products.create((p) => {
-            p.name = "Cooking Oil";
-            p.default_selling_price = 2200;
-            p.stock = 10;
+        const water = await productsCollection.create((p) => {
+            p.name = "Mineral Water";
             p.unit = "box";
+            p.stock = 5;
+            p.default_selling_price = 320;
             p.created_at = now;
             p.updated_at = now;
         });
 
-        // ======================
-        // Product Batches
-        // ======================
-        await batches.create((b) => {
-            b.product_id = sugar.id;
-            b.purchase_price = 55;
-            b.quantity = 100;
-            b.remaining_quantity = 40;
-            b.unit = "kg";
-            b.purchased_at = now - 1000 * 60 * 60 * 24 * 7;
+        const eggs = await productsCollection.create((p) => {
+            p.name = "Eggs";
+            p.unit = "dozen";
+            p.stock = 8;
+            p.default_selling_price = 180;
+            p.created_at = now;
+            p.updated_at = now;
+        });
+
+        /* ------------------ PRODUCT BATCHES ------------------ */
+        await batchesCollection.create((b) => {
+            b.product_id = teff.id;
+            b.purchase_price = 7200;
+            b.quantity = 2;
+            b.remaining_quantity = 1;
+            b.purchased_at = now - 10 * 86400000;
             b.created_at = now;
             b.updated_at = now;
         });
 
-        await batches.create((b) => {
+        await batchesCollection.create((b) => {
+            b.product_id = teff.id;
+            b.purchase_price = 7400;
+            b.quantity = 2;
+            b.remaining_quantity = 2;
+            b.purchased_at = now - 4 * 86400000;
+            b.created_at = now;
+            b.updated_at = now;
+        });
+
+        await batchesCollection.create((b) => {
             b.product_id = sugar.id;
             b.purchase_price = 58;
             b.quantity = 50;
-            b.remaining_quantity = 50;
-            b.unit = "kg";
-            b.purchased_at = now - 1000 * 60 * 60 * 24 * 2;
+            b.remaining_quantity = 42;
+            b.purchased_at = now - 6 * 86400000;
             b.created_at = now;
             b.updated_at = now;
         });
 
-        await batches.create((b) => {
-            b.product_id = rice.id;
-            b.purchase_price = 70;
-            b.quantity = 120;
-            b.remaining_quantity = 90;
-            b.unit = "kg";
-            b.purchased_at = now - 1000 * 60 * 60 * 24 * 5;
-            b.created_at = now;
-            b.updated_at = now;
+        /* ------------------ CUSTOMERS ------------------ */
+        const abeba = await customersCollection.create((c) => {
+            c.name = "Abeba Store";
+            c.phone = "0912345678";
+            c.created_at = now;
+            c.updated_at = now;
         });
 
-        await batches.create((b) => {
-            b.product_id = oil.id;
-            b.purchase_price = 2000;
-            b.quantity = 10;
-            b.remaining_quantity = 8;
-            b.unit = "box";
-            b.purchased_at = now - 1000 * 60 * 60 * 24 * 10;
-            b.created_at = now;
-            b.updated_at = now;
+        const samson = await customersCollection.create((c) => {
+            c.name = "Samson Bakery";
+            c.phone = "0922334455";
+            c.created_at = now;
+            c.updated_at = now;
         });
 
-        // ======================
-        // Credit Sale
-        // ======================
-        const creditSale = await sales.create((s) => {
-            s.customer_id = customer1.id;
-            s.type = "credit";
-            s.sold_at = now - 1000 * 60 * 60 * 24;
-            s.created_at = now;
-            s.updated_at = now;
-        });
-
-        const sugarItem = await saleItems.create((i) => {
-            i.sale_id = creditSale.id;
-            i.product_id = sugar.id;
-            i.quantity = 30;
-            i.unit = "kg";
-            i.selling_price = 65;
-            i.cost_price = 55;
-            i.created_at = now;
-            i.updated_at = now;
-        });
-
-        // ======================
-        // Cash Sale
-        // ======================
-        const cashSale = await sales.create((s) => {
+        /* ------------------ SALES ------------------ */
+        const sale1 = await salesCollection.create((s) => {
+            s.customer_id = abeba.id;
             s.type = "cash";
-            s.sold_at = now;
+            s.sold_at = now - 60 * 60 * 1000;
             s.created_at = now;
             s.updated_at = now;
         });
 
-        await saleItems.create((i) => {
-            i.sale_id = cashSale.id;
-            i.product_id = rice.id;
-            i.quantity = 20;
-            i.unit = "kg";
-            i.selling_price = 80;
-            i.cost_price = 70;
-            i.created_at = now;
-            i.updated_at = now;
+        const sale2 = await salesCollection.create((s) => {
+            s.customer_id = samson.id;
+            s.type = "credit";
+            s.sold_at = now - 3 * 60 * 60 * 1000;
+            s.created_at = now;
+            s.updated_at = now;
         });
 
-        // ======================
-        // Partial Credit Payment
-        // ======================
-        const payment = await payments.create((p) => {
-            p.customer_id = customer1.id;
-            p.total_amount = 1000;
+        /* ------------------ SALE ITEMS ------------------ */
+        const saleItem1 = await saleItemsCollection.create((si) => {
+            si.sale_id = sale1.id;
+            si.product_id = sugar.id;
+            si.quantity = 10;
+            si.selling_price = 65;
+            si.cost_price = 58;
+            si.created_at = now;
+            si.updated_at = now;
+        });
+
+        const saleItem2 = await saleItemsCollection.create((si) => {
+            si.sale_id = sale2.id;
+            si.product_id = teff.id;
+            si.quantity = 1;
+            si.selling_price = 8000;
+            si.cost_price = 7200;
+            si.created_at = now;
+            si.updated_at = now;
+        });
+
+        /* ------------------ CREDIT PAYMENT ------------------ */
+        const payment = await creditPaymentsCollection.create((p) => {
+            p.customer_id = samson.id;
+            p.total_amount = 3000;
             p.paid_at = now;
             p.created_at = now;
             p.updated_at = now;
         });
 
-        await paymentItems.create((pi) => {
-            pi.credit_payment_id = payment.id;
-            pi.sale_item_id = sugarItem.id;
-            pi.amount_applied = 1000;
-            pi.created_at = now;
-            pi.updated_at = now;
+        await creditPaymentItemsCollection.create((cpi) => {
+            cpi.credit_payment_id = payment.id;
+            cpi.sale_item_id = saleItem2.id;
+            cpi.amount_applied = 3000;
+            cpi.created_at = now;
+            cpi.updated_at = now;
         });
-
-        console.log("✅ Seeding complete");
     });
+
+    console.log("Database seeded successfully");
 };
 
 export default seedDB;
