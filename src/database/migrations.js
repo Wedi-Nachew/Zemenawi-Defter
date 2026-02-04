@@ -40,6 +40,21 @@ const migrations = schemaMigrations({
                 },
             ],
         },
+        {
+            toVersion: 4,
+            steps: [
+                {
+                    type: "add_columns",
+                    table: "product_batches",
+                    columns: [{ name: "unit", type: "string" }],
+                },
+                {
+                    type: "add_columns",
+                    table: "sale_items",
+                    columns: [{ name: "unit", type: "string" }],
+                },
+            ],
+        },
     ],
 });
 

@@ -2,8 +2,9 @@ import { appSchema, tableSchema } from "@nozbe/watermelondb";
 
 // ZemenawiDefter Database Schema
 // Version 3 (adds product_batches + cost_price on sale_items)
+// Version 4 (adds unit columns to product_batches and sale_items)
 const schema = appSchema({
-    version: 3,
+    version: 4,
     tables: [
         // Customers
         tableSchema({
@@ -37,6 +38,7 @@ const schema = appSchema({
                 { name: "purchase_price", type: "number" },
                 { name: "quantity", type: "number" },
                 { name: "remaining_quantity", type: "number" },
+                { name: "unit", type: "string" },
                 { name: "purchased_at", type: "number" },
                 { name: "created_at", type: "number" },
                 { name: "updated_at", type: "number" },
@@ -67,6 +69,7 @@ const schema = appSchema({
                 { name: "sale_id", type: "string", isIndexed: true },
                 { name: "product_id", type: "string", isIndexed: true },
                 { name: "quantity", type: "number" },
+                { name: "unit", type: "string" },
                 { name: "selling_price", type: "number" },
                 { name: "cost_price", type: "number" }, // FIFO calculated cost price
                 { name: "created_at", type: "number" },

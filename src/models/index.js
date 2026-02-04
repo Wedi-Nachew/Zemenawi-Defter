@@ -6,7 +6,7 @@ import ProductBatch from "./ProductBatch";
 import Sale from "./Sale";
 import SaleItem from "./SaleItem";
 
-export const models = {
+export const models = [
     Customer,
     Product,
     Sale,
@@ -14,7 +14,7 @@ export const models = {
     CreditPayment,
     CreditPaymentItem,
     ProductBatch,
-};
+];
 
 export {
     CreditPayment,
