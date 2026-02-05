@@ -3,8 +3,9 @@ import { appSchema, tableSchema } from "@nozbe/watermelondb";
 // ZemenawiDefter Database Schema
 // Version 3 (adds product_batches + cost_price on sale_items)
 // Version 4 (adds unit columns to product_batches and sale_items)
+// Version 5 (adds receipt_no to credit_payments)
 const schema = appSchema({
-    version: 4,
+    version: 5,
     tables: [
         // Customers
         tableSchema({
@@ -84,6 +85,7 @@ const schema = appSchema({
                 { name: "customer_id", type: "string", isIndexed: true },
                 { name: "total_amount", type: "number" },
                 { name: "paid_at", type: "number", isIndexed: true }, // timestamp of payment
+                { name: "receipt_no", type: "string", isOptional: true },
                 { name: "created_at", type: "number" },
                 { name: "updated_at", type: "number" },
             ],

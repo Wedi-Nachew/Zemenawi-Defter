@@ -1,6 +1,8 @@
-import { useMemo, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import {
+    ActivityIndicator,
     Button,
     Card,
     Chip,
@@ -12,6 +14,7 @@ import {
     TextInput,
 } from "react-native-paper";
 import Screen from "../../src/components/Screen";
+import { getSalesReportByDateRange } from "../../src/services/reportingService";
 import theme from "../../src/theme";
 
 const ReportsScreen = () => {
@@ -20,6 +23,14 @@ const ReportsScreen = () => {
     const [calendarOpen, setCalendarOpen] = useState(false);
     const [fromDate, setFromDate] = useState("Jan 01, 2026");
     const [toDate, setToDate] = useState("Feb 03, 2026");
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+    const [report, setReport] = useState({
+        profit: 0,
+        revenue: 0,
+        cogs: 0,
+        items: [],
+    });
 
     const rangeLabel = useMemo(() => {
         if (range === "today") return "Today";
@@ -29,59 +40,105 @@ const ReportsScreen = () => {
         return "This Month";
     }, [range, fromDate, toDate]);
 
-    const data = useMemo(
-        () => ({
-            profit: 45200,
-            revenue: 118450,
-            cogs: 73250,
-            items: [
-                {
-                    id: "p1",
-                    name: "Coca Cola 500ml (Crate)",
-                    sold: 120,
-                    revenue: 6000,
-                    cogs: 4500,
-                    stock: 24,
-                },
-                {
-                    id: "p2",
-                    name: "Sunflower Oil 5L",
-                    sold: 45,
-                    revenue: 38250,
-                    cogs: 32000,
-                    stock: 6,
-                },
-                {
-                    id: "p3",
-                    name: "Mama Pasta (Carton)",
-                    sold: 200,
-                    revenue: 120000,
-                    cogs: 95000,
-                    stock: 18,
-                },
-                {
-                    id: "p4",
-                    name: "Berbere Spice Mix (1kg)",
-                    sold: 10,
-                    revenue: 2500,
-                    cogs: 3000,
-                    stock: 2,
-                },
-            ],
-        }),
-        [],
+    const getRangeDates = () => {
+        const now = new Date();
+        const end = new Date(now);
+        end.setHours(23, 59, 59, 999);
+
+        if (range === "today") {
+            const start = new Date(now);
+            start.setHours(0, 0, 0, 0);
+            return { start, end };
+        }
+        if (range === "week") {
+            const start = new Date(now);
+            start.setDate(start.getDate() - 6);
+            start.setHours(0, 0, 0, 0);
+            return { start, end };
+        }
+        if (range === "custom") {
+            const parsedStart = Date.parse(fromDate);
+            const parsedEnd = Date.parse(toDate);
+            if (
+                !Number.isNaN(parsedStart) &&
+                !Number.isNaN(parsedEnd) &&
+                parsedStart <= parsedEnd
+            ) {
+                const start = new Date(parsedStart);
+                const customEnd = new Date(parsedEnd);
+                customEnd.setHours(23, 59, 59, 999);
+                start.setHours(0, 0, 0, 0);
+                return { start, end: customEnd };
+            }
+        }
+
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        start.setHours(0, 0, 0, 0);
+        return { start, end };
+    };
+
+    const customRangeInvalid = useMemo(() => {
+        if (range !== "custom") return false;
+        const parsedStart = Date.parse(fromDate);
+        const parsedEnd = Date.parse(toDate);
+        return (
+            Number.isNaN(parsedStart) ||
+            Number.isNaN(parsedEnd) ||
+            parsedStart > parsedEnd
+        );
+    }, [range, fromDate, toDate]);
+
+    const loadReport = useCallback(async () => {
+        setLoading(true);
+        try {
+            setError("");
+            const { start, end } = getRangeDates();
+            const result = await getSalesReportByDateRange(
+                start.getTime(),
+                end.getTime(),
+            );
+            setReport(result);
+        } catch (error) {
+            console.error("Failed to load report", error);
+            setReport({ profit: 0, revenue: 0, cogs: 0, items: [] });
+            setError("Unable to load reports.");
+        } finally {
+            setLoading(false);
+        }
+    }, [range, fromDate, toDate]);
+
+    useEffect(() => {
+        let active = true;
+        if (!active) return;
+        loadReport();
+        return () => {
+            active = false;
+        };
+    }, [loadReport]);
+
+    useFocusEffect(
+        useCallback(() => {
+            loadReport();
+        }, [loadReport]),
     );
 
     const filteredItems = useMemo(() => {
-        return data.items.filter((item) => {
+        return report.items.filter((item) => {
             if (filter === "high") return item.revenue - item.cogs > 5000;
             if (filter === "low") return item.stock <= 5;
             return true;
         });
-    }, [data.items, filter]);
+    }, [report.items, filter]);
 
     return (
         <Screen style={styles.container}>
+            {!!error && (
+                <Card style={styles.errorCard}>
+                    <Card.Content>
+                        <Text style={styles.errorText}>{error}</Text>
+                    </Card.Content>
+                </Card>
+            )}
             <Card
                 style={styles.rangeCard}
                 onPress={() => setCalendarOpen(true)}
@@ -116,7 +173,7 @@ const ReportsScreen = () => {
                                 Total Net Profit
                             </Text>
                             <Text style={styles.summaryValue}>
-                                ETB {data.profit.toLocaleString()}
+                                ETB {report.profit.toLocaleString()}
                             </Text>
                         </View>
                         <Chip
@@ -124,75 +181,155 @@ const ReportsScreen = () => {
                             style={styles.growthChip}
                             textStyle={styles.growthText}
                         >
-                            +12%
+                            {report.profit >= 0 ? "+" : ""}
+                            {report.revenue > 0
+                                ? Math.round(
+                                      ((report.profit || 0) / report.revenue) *
+                                          100,
+                                  )
+                                : 0}
+                            %
                         </Chip>
                     </View>
                     <View style={styles.summaryRow}>
                         <Text style={styles.summaryMeta}>
-                            REV: ETB {data.revenue.toLocaleString()}
+                            REV: ETB {report.revenue.toLocaleString()}
                         </Text>
                         <Text style={styles.summaryMeta}>
-                            COGS: ETB {data.cogs.toLocaleString()}
+                            COGS: ETB {report.cogs.toLocaleString()}
                         </Text>
                     </View>
                 </Card.Content>
             </Card>
 
+            <View style={styles.filterRow}>
+                <Chip
+                    selected={filter === "all"}
+                    onPress={() => setFilter("all")}
+                    mode={filter === "all" ? "flat" : "outlined"}
+                    selectedColor="#FFFFFF"
+                    textStyle={{
+                        color: filter === "all" ? "#FFFFFF" : theme.colors.text,
+                    }}
+                    style={[
+                        styles.filterChip,
+                        filter === "all" && styles.filterChipActive,
+                    ]}
+                >
+                    All
+                </Chip>
+                <Chip
+                    selected={filter === "high"}
+                    onPress={() => setFilter("high")}
+                    mode={filter === "high" ? "flat" : "outlined"}
+                    selectedColor="#FFFFFF"
+                    textStyle={{
+                        color:
+                            filter === "high" ? "#FFFFFF" : theme.colors.text,
+                    }}
+                    style={[
+                        styles.filterChip,
+                        filter === "high" && styles.filterChipActive,
+                    ]}
+                >
+                    High Margin
+                </Chip>
+                <Chip
+                    selected={filter === "low"}
+                    onPress={() => setFilter("low")}
+                    mode={filter === "low" ? "flat" : "outlined"}
+                    selectedColor="#FFFFFF"
+                    textStyle={{
+                        color: filter === "low" ? "#FFFFFF" : theme.colors.text,
+                    }}
+                    style={[
+                        styles.filterChip,
+                        filter === "low" && styles.filterChipActive,
+                    ]}
+                >
+                    Low Stock
+                </Chip>
+            </View>
+
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ gap: 12, paddingBottom: 24 }}
             >
-                {filteredItems.map((item) => {
-                    const net = item.revenue - item.cogs;
-                    return (
-                        <Card key={item.id} style={styles.itemCard}>
-                            <Card.Content style={{ gap: 12 }}>
-                                <View style={styles.itemHeader}>
-                                    <Text style={styles.itemTitle}>
-                                        {item.name}
-                                    </Text>
-                                    <Icon
-                                        source="chevron-right"
-                                        size={18}
-                                        color={theme.colors.onSurface}
-                                    />
-                                </View>
-                                <View style={styles.itemMetricsRow}>
-                                    <Metric
-                                        label="Sold"
-                                        value={`${item.sold} units`}
-                                    />
-                                    <Metric
-                                        label="REV"
-                                        value={`${item.revenue.toLocaleString()}`}
-                                    />
-                                    <Metric
-                                        label="COGS"
-                                        value={`${item.cogs.toLocaleString()}`}
-                                    />
-                                </View>
-                                <View style={styles.netRow}>
-                                    <Text style={styles.netLabel}>
-                                        {net >= 0 ? "Net Profit" : "Net Loss"}
-                                    </Text>
-                                    <Text
-                                        style={[
-                                            styles.netValue,
-                                            {
-                                                color:
-                                                    net >= 0
-                                                        ? theme.colors.secondary
-                                                        : theme.colors.error,
-                                            },
-                                        ]}
-                                    >
-                                        ETB {Math.abs(net).toLocaleString()}
-                                    </Text>
-                                </View>
-                            </Card.Content>
-                        </Card>
-                    );
-                })}
+                {loading && (
+                    <Card style={styles.itemCard}>
+                        <Card.Content style={{ gap: 10 }}>
+                            <ActivityIndicator />
+                            <Text style={styles.metricLabel}>
+                                Loading report...
+                            </Text>
+                        </Card.Content>
+                    </Card>
+                )}
+                {!loading && filteredItems.length === 0 && (
+                    <Card style={styles.itemCard}>
+                        <Card.Content>
+                            <Text style={styles.metricLabel}>
+                                No sales in this period.
+                            </Text>
+                        </Card.Content>
+                    </Card>
+                )}
+                {!loading &&
+                    filteredItems.map((item) => {
+                        const net = item.revenue - item.cogs;
+                        return (
+                            <Card key={item.id} style={styles.itemCard}>
+                                <Card.Content style={{ gap: 12 }}>
+                                    <View style={styles.itemHeader}>
+                                        <Text style={styles.itemTitle}>
+                                            {item.name}
+                                        </Text>
+                                        <Icon
+                                            source="chevron-right"
+                                            size={18}
+                                            color={theme.colors.onSurface}
+                                        />
+                                    </View>
+                                    <View style={styles.itemMetricsRow}>
+                                        <Metric
+                                            label="Sold"
+                                            value={`${item.sold} units`}
+                                        />
+                                        <Metric
+                                            label="REV"
+                                            value={`${item.revenue.toLocaleString()}`}
+                                        />
+                                        <Metric
+                                            label="COGS"
+                                            value={`${item.cogs.toLocaleString()}`}
+                                        />
+                                    </View>
+                                    <View style={styles.netRow}>
+                                        <Text style={styles.netLabel}>
+                                            {net >= 0
+                                                ? "Net Profit"
+                                                : "Net Loss"}
+                                        </Text>
+                                        <Text
+                                            style={[
+                                                styles.netValue,
+                                                {
+                                                    color:
+                                                        net >= 0
+                                                            ? theme.colors
+                                                                  .secondary
+                                                            : theme.colors
+                                                                  .error,
+                                                },
+                                            ]}
+                                        >
+                                            ETB {Math.abs(net).toLocaleString()}
+                                        </Text>
+                                    </View>
+                                </Card.Content>
+                            </Card>
+                        );
+                    })}
             </ScrollView>
 
             <Portal>
@@ -326,11 +463,20 @@ const ReportsScreen = () => {
                         <Button
                             mode="contained"
                             style={{ flex: 1 }}
-                            onPress={() => setCalendarOpen(false)}
+                            onPress={() => {
+                                if (customRangeInvalid) return;
+                                setCalendarOpen(false);
+                            }}
+                            disabled={customRangeInvalid}
                         >
                             Apply
                         </Button>
                     </View>
+                    {customRangeInvalid && (
+                        <Text style={styles.errorText}>
+                            Enter a valid custom date range.
+                        </Text>
+                    )}
                 </Modal>
             </Portal>
         </Screen>
@@ -425,6 +571,13 @@ const styles = StyleSheet.create({
     summaryMeta: {
         color: "#E0EAFF",
         fontSize: 12,
+    },
+    errorCard: {
+        backgroundColor: "#FEE2E2",
+        borderRadius: 12,
+        padding: 4,
+        borderWidth: 1,
+        borderColor: "#FCA5A5",
     },
     filterRow: {
         flexDirection: "row",
@@ -528,6 +681,11 @@ const styles = StyleSheet.create({
     },
     netValue: {
         fontWeight: "700",
+    },
+    errorText: {
+        color: theme.colors.error,
+        fontSize: 12,
+        marginTop: 8,
     },
 });
 

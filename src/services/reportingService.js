@@ -154,6 +154,85 @@ const getCustomerPayments = async (customerId, limit = 20) => {
         .fetch();
 };
 
+const getSalesReportByDateRange = async (startDate, endDate) => {
+    const sales = await salesCollection
+        .query(
+            Q.where("sold_at", Q.gte(startDate)),
+            Q.where("sold_at", Q.lte(endDate)),
+        )
+        .fetch();
+
+    if (sales.length === 0) {
+        return {
+            revenue: 0,
+            cogs: 0,
+            profit: 0,
+            items: [],
+        };
+    }
+
+    const saleIds = sales.map((sale) => sale.id);
+
+    const saleItems = await saleItemCollection
+        .query(Q.where("sale_id", Q.oneOf(saleIds)))
+        .fetch();
+
+    if (saleItems.length === 0) {
+        return {
+            revenue: 0,
+            cogs: 0,
+            profit: 0,
+            items: [],
+        };
+    }
+
+    const productIds = Array.from(
+        new Set(saleItems.map((item) => item.productId).filter(Boolean)),
+    );
+    const products = productIds.length
+        ? await productCollection
+              .query(Q.where("id", Q.oneOf(productIds)))
+              .fetch()
+        : [];
+    const productMap = new Map(products.map((p) => [p.id, p]));
+
+    let revenue = 0;
+    let cogs = 0;
+    const itemMap = new Map();
+
+    for (const item of saleItems) {
+        const itemRevenue = (item.sellingPrice || 0) * (item.quantity || 0);
+        const itemCogs = (item.costPrice || 0) * (item.quantity || 0);
+        revenue += itemRevenue;
+        cogs += itemCogs;
+
+        const product = productMap.get(item.productId) || null;
+        const key = item.productId || item.id;
+        const existing = itemMap.get(key) || {
+            id: product?.id || key,
+            name: product?.name || "Item",
+            sold: 0,
+            revenue: 0,
+            cogs: 0,
+            stock: product?.stock ?? 0,
+        };
+
+        existing.sold += item.quantity || 0;
+        existing.revenue += itemRevenue;
+        existing.cogs += itemCogs;
+        existing.stock = product?.stock ?? existing.stock;
+
+        itemMap.set(key, existing);
+    }
+
+    return {
+        revenue,
+        cogs,
+        profit: revenue - cogs,
+        items: Array.from(itemMap.values()),
+    };
+};
+
 const getDashboardSummary = async ({
     lowStockThreshold = 5,
     recentLimit = 5,
@@ -198,6 +277,7 @@ export {
     getProfitByDateRange,
     getProfitPerProduct,
     getRecentSales,
+    getSalesReportByDateRange,
     getTodaySalesTotal,
     getTopSellingProducts,
 };

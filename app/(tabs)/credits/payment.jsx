@@ -1,7 +1,8 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import {
+    ActivityIndicator,
     Button,
     Card,
     Chip,
@@ -13,75 +14,83 @@ import {
     TextInput,
 } from "react-native-paper";
 import Screen from "../../../src/components/Screen";
+import {
+    getCustomerById,
+    getCustomerUnpaidItems,
+    payGenericFIFO,
+    payTowardSaleItems,
+} from "../../../src/services/creditService";
 import theme from "../../../src/theme";
-
-const creditCatalog = {
-    c1: {
-        id: "c1",
-        name: "Abebe Kebede",
-        balance: 12500,
-        invoices: [
-            {
-                id: "i1",
-                title: "Sugar 50kg",
-                date: "Sep 12, 2023",
-                amount: 2000,
-            },
-            { id: "i2", title: "Oil 5L", date: "Sep 15, 2023", amount: 850 },
-            {
-                id: "i3",
-                title: "Pasta Pack x24",
-                date: "Oct 01, 2023",
-                amount: 1200,
-            },
-        ],
-    },
-    c2: {
-        id: "c2",
-        name: "Sara Tesfaye",
-        balance: 8200,
-        invoices: [
-            {
-                id: "i4",
-                title: "Flour (25kg)",
-                date: "Oct 11, 2023",
-                amount: 3000,
-            },
-            {
-                id: "i5",
-                title: "Harar Coffee",
-                date: "Oct 21, 2023",
-                amount: 5200,
-            },
-        ],
-    },
-};
 
 const MakePaymentScreen = () => {
     const { id } = useLocalSearchParams();
-    const customer = useMemo(
-        () => (typeof id === "string" ? creditCatalog[id] : undefined),
-        [id],
-    );
-
-    const [amount, setAmount] = useState("2850");
+    const [customer, setCustomer] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+    const [amount, setAmount] = useState("");
     const [mode, setMode] = useState("auto");
-    const [selected, setSelected] = useState(["i1", "i2"]);
+    const [selected, setSelected] = useState([]);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [unpaidItems, setUnpaidItems] = useState([]);
+    const [lastPaidAmount, setLastPaidAmount] = useState(0);
+    const [lastReceiptNo, setLastReceiptNo] = useState("");
+    const isMounted = useRef(true);
 
-    const receipt = useMemo(
-        () => `#ZD-${Math.floor(8000 + Math.random() * 999)}`,
-        [showSuccess],
+    const loadCustomer = async () => {
+        if (typeof id !== "string") return;
+        setLoading(true);
+        setError("");
+        try {
+            const record = await getCustomerById(id);
+            const unpaid = await getCustomerUnpaidItems(record);
+            const enriched = await Promise.all(
+                unpaid.map(async (entry) => {
+                    const product = await entry.saleItem.product.fetch();
+                    return {
+                        id: entry.saleItem.id,
+                        title: product?.name || "Item",
+                        date: entry.sale?.soldAt
+                            ? new Date(entry.sale.soldAt).toLocaleDateString()
+                            : "",
+                        amount: entry.remainingBalance,
+                        saleItem: entry.saleItem,
+                    };
+                }),
+            );
+            if (!isMounted.current) return;
+            setCustomer(record);
+            setUnpaidItems(enriched);
+        } catch (loadError) {
+            console.error("Failed to load customer", loadError);
+            if (isMounted.current) {
+                setError("Unable to load customer details.");
+            }
+        } finally {
+            if (isMounted.current) setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        isMounted.current = true;
+        loadCustomer();
+
+        return () => {
+            isMounted.current = false;
+        };
+    }, [id]);
+
+    const totalOutstanding = useMemo(
+        () => unpaidItems.reduce((sum, item) => sum + item.amount, 0),
+        [unpaidItems],
     );
 
-    // Always define invoices, parsedAmount, and autoSelected hooks before any early return
     const invoices = useMemo(() => {
-        if (!customer) return [];
-        return customer.invoices.map((inv) => ({
-            ...inv,
-            invoiceNo: `Inv #${inv.id.replace("i", "10")}`,
+        return unpaidItems.map((item, index) => ({
+            ...item,
+            invoiceNo: `Inv #${String(index + 1).padStart(3, "0")}`,
         }));
-    }, [customer]);
+    }, [unpaidItems]);
 
     const parsedAmount = Number(String(amount).replace(/,/g, "")) || 0;
 
@@ -97,7 +106,79 @@ const MakePaymentScreen = () => {
         return ids;
     }, [invoices, parsedAmount]);
 
-    if (!customer) {
+    const activeSelected = mode === "auto" ? autoSelected : selected;
+
+    const selectedTotal = useMemo(() => {
+        return invoices
+            .filter((inv) => selected.includes(inv.id))
+            .reduce((sum, inv) => sum + inv.amount, 0);
+    }, [invoices, selected]);
+
+    const buildAllocations = () => {
+        let remaining = parsedAmount;
+        const list =
+            mode === "auto"
+                ? invoices
+                : invoices.filter((inv) => selected.includes(inv.id));
+        const allocations = [];
+        for (const inv of list) {
+            if (remaining <= 0) break;
+            const amountToApply = Math.min(inv.amount, remaining);
+            allocations.push({ saleItem: inv.saleItem, amount: amountToApply });
+            remaining -= amountToApply;
+        }
+        return allocations;
+    };
+
+    const handleConfirm = async () => {
+        setError("");
+        if (parsedAmount <= 0) {
+            setError("Enter a valid amount.");
+            return;
+        }
+        if (parsedAmount > totalOutstanding) {
+            setError("Amount exceeds outstanding balance.");
+            return;
+        }
+        if (mode === "select" && selected.length === 0) {
+            setError("Select at least one item.");
+            return;
+        }
+        if (mode === "select" && parsedAmount > selectedTotal) {
+            setError("Amount exceeds selected items total.");
+            return;
+        }
+
+        setSaving(true);
+        try {
+            if (mode === "auto") {
+                const payment = await payGenericFIFO(customer, parsedAmount);
+                setLastPaidAmount(parsedAmount);
+                setLastReceiptNo(payment?.receiptNo || "");
+            } else {
+                const allocations = buildAllocations();
+                const paidAmount = allocations.reduce(
+                    (sum, entry) => sum + entry.amount,
+                    0,
+                );
+                const payment = await payTowardSaleItems(customer, allocations);
+                setLastPaidAmount(paidAmount);
+                setLastReceiptNo(payment?.receiptNo || "");
+            }
+            await loadCustomer();
+            setAmount("");
+            setSelected([]);
+            setMode("auto");
+            setShowSuccess(true);
+        } catch (paymentError) {
+            console.error("Failed to apply payment", paymentError);
+            setError("Unable to record payment.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (loading || !customer) {
         return (
             <Screen contentContainerStyle={styles.container}>
                 <View style={styles.headerRow}>
@@ -112,14 +193,17 @@ const MakePaymentScreen = () => {
                 </View>
                 <Card style={styles.card}>
                     <Card.Content>
-                        <Text style={styles.meta}>Customer not found.</Text>
+                        <Text style={styles.meta}>
+                            {loading
+                                ? "Loading customer…"
+                                : error || "Customer not found."}
+                        </Text>
+                        {loading && <ActivityIndicator />}
                     </Card.Content>
                 </Card>
             </Screen>
         );
     }
-
-    const activeSelected = mode === "auto" ? autoSelected : selected;
 
     return (
         <Screen style={styles.container}>
@@ -186,6 +270,9 @@ const MakePaymentScreen = () => {
 
             <Card style={styles.card}>
                 <Card.Content style={{ gap: 12 }}>
+                    {invoices.length === 0 && (
+                        <Text style={styles.meta}>No unpaid items.</Text>
+                    )}
                     {invoices.map((inv) => {
                         const isSelected = activeSelected.includes(inv.id);
                         return (
@@ -195,7 +282,9 @@ const MakePaymentScreen = () => {
                                     if (mode !== "select") return;
                                     setSelected((prev) =>
                                         prev.includes(inv.id)
-                                            ? prev.filter((id) => id !== inv.id)
+                                            ? prev.filter(
+                                                  (itemId) => itemId !== inv.id,
+                                              )
                                             : [...prev, inv.id],
                                     );
                                 }}
@@ -238,12 +327,16 @@ const MakePaymentScreen = () => {
                 <Text style={styles.totalValue}>ETB {amount}</Text>
             </View>
 
+            {!!error && <Text style={styles.errorText}>{error}</Text>}
+
             <Button
                 mode="contained"
                 icon="arrow-right"
                 contentStyle={styles.confirmContent}
                 style={styles.confirmButton}
-                onPress={() => setShowSuccess(true)}
+                onPress={handleConfirm}
+                loading={saving}
+                disabled={saving}
             >
                 Confirm Payment
             </Button>
@@ -276,12 +369,14 @@ const MakePaymentScreen = () => {
                                     Amount Paid
                                 </Text>
                                 <Text style={styles.amountValue}>
-                                    ETB {parsedAmount.toLocaleString()}
+                                    ETB {lastPaidAmount.toLocaleString()}
                                 </Text>
                             </View>
                             <View style={styles.rowBetween}>
                                 <Text style={styles.meta}>Receipt No</Text>
-                                <Text style={styles.metaStrong}>{receipt}</Text>
+                                <Text style={styles.metaStrong}>
+                                    {lastReceiptNo || "-"}
+                                </Text>
                             </View>
                             <View style={styles.rowBetween}>
                                 <Text style={styles.meta}>Customer</Text>
@@ -292,7 +387,7 @@ const MakePaymentScreen = () => {
                             <View style={styles.rowBetween}>
                                 <Text style={styles.meta}>Date</Text>
                                 <Text style={styles.metaStrong}>
-                                    Feb 03, 2026 • 4:30 PM
+                                    {new Date().toLocaleString()}
                                 </Text>
                             </View>
                             <View style={styles.rowBetween}>
@@ -300,7 +395,11 @@ const MakePaymentScreen = () => {
                                     Remaining Balance
                                 </Text>
                                 <Text style={styles.metaStrong}>
-                                    ETB {customer?.balance?.toLocaleString()}
+                                    ETB{" "}
+                                    {Math.max(
+                                        totalOutstanding - lastPaidAmount,
+                                        0,
+                                    ).toLocaleString()}
                                 </Text>
                             </View>
                         </Card.Content>
@@ -444,6 +543,10 @@ const styles = StyleSheet.create({
     totalValue: {
         color: theme.colors.text,
         fontWeight: "700",
+    },
+    errorText: {
+        color: theme.colors.error,
+        fontSize: 12,
     },
     confirmButton: {
         marginTop: "auto",

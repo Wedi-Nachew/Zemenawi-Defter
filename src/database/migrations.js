@@ -55,6 +55,16 @@ const migrations = schemaMigrations({
                 },
             ],
         },
+        {
+            toVersion: 5,
+            steps: [
+                {
+                    type: "add_columns",
+                    table: "credit_payments",
+                    columns: [{ name: "receipt_no", type: "string" }],
+                },
+            ],
+        },
     ],
 });
 

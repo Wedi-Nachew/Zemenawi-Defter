@@ -21,6 +21,7 @@ class CreditPayment extends Model {
     @field("customer_id") customerId;
     @field("total_amount") totalAmount;
     @field("paid_at") paidAt;
+    @field("receipt_no") receiptNo;
     @readonly @date("created_at") createdAt;
     @date("updated_at") updatedAt;
 

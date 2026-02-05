@@ -1,104 +1,95 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { Button, Card, Chip, Icon, Text } from "react-native-paper";
+import {
+    ActivityIndicator,
+    Button,
+    Card,
+    Chip,
+    Icon,
+    Text,
+} from "react-native-paper";
 import InitialAvatar from "../../../src/components/InitialAvatar";
 import Screen from "../../../src/components/Screen";
+import {
+    getCustomerById,
+    getCustomerPayments,
+    getCustomerUnpaidItems,
+} from "../../../src/services/creditService";
 import theme from "../../../src/theme";
-
-const creditCatalog = {
-    c1: {
-        id: "c1",
-        name: "Abebe Kebede",
-        phone: "+251 911 234 567",
-        balance: 12500,
-        unpaidItems: [
-            {
-                id: "u1",
-                title: "Teff Flour (10kg)",
-                qty: 2,
-                date: "Oct 24, 2023",
-                amount: 2500,
-            },
-            {
-                id: "u2",
-                title: "Cooking Oil (5L)",
-                qty: 3,
-                date: "Oct 20, 2023",
-                amount: 6000,
-            },
-            {
-                id: "u3",
-                title: "Sugar (10kg)",
-                qty: 5,
-                date: "Oct 15, 2023",
-                amount: 4000,
-            },
-        ],
-        payments: [
-            { id: "p1", date: "Oct 18, 2023", amount: 2000 },
-            { id: "p2", date: "Oct 05, 2023", amount: 1500 },
-        ],
-    },
-    c2: {
-        id: "c2",
-        name: "Sara Tesfaye",
-        phone: "+251 912 345 678",
-        balance: 8200,
-        unpaidItems: [
-            {
-                id: "u4",
-                title: "Harar Coffee",
-                qty: 4,
-                date: "Oct 21, 2023",
-                amount: 5200,
-            },
-            {
-                id: "u5",
-                title: "Flour (25kg)",
-                qty: 1,
-                date: "Oct 11, 2023",
-                amount: 3000,
-            },
-        ],
-        payments: [{ id: "p3", date: "Oct 02, 2023", amount: 1000 }],
-    },
-    c3: {
-        id: "c3",
-        name: "Restaurant Tana",
-        phone: "+251 911 889 900",
-        balance: 1500,
-        unpaidItems: [
-            {
-                id: "u6",
-                title: "Mineral Water",
-                qty: 5,
-                date: "Oct 22, 2023",
-                amount: 1500,
-            },
-        ],
-        payments: [{ id: "p4", date: "Oct 10, 2023", amount: 700 }],
-    },
-    c4: {
-        id: "c4",
-        name: "Dawit Meles",
-        phone: "+251 900 112 233",
-        balance: 0,
-        unpaidItems: [],
-        payments: [{ id: "p5", date: "Oct 25, 2023", amount: 500 }],
-    },
-};
 
 const CreditDetailsScreen = () => {
     const { id } = useLocalSearchParams();
     const [tab, setTab] = useState("unpaid");
+    const [customer, setCustomer] = useState(null);
+    const [unpaidItems, setUnpaidItems] = useState([]);
+    const [payments, setPayments] = useState([]);
+    const [loading, setLoading] = useState(false);
 
-    const customer = useMemo(
-        () => (typeof id === "string" ? creditCatalog[id] : undefined),
-        [id],
+    useEffect(() => {
+        let active = true;
+
+        const loadCustomer = async () => {
+            if (typeof id !== "string") return;
+            setLoading(true);
+            try {
+                const record = await getCustomerById(id);
+                const unpaid = await getCustomerUnpaidItems(record);
+                const enriched = await Promise.all(
+                    unpaid.map(async (entry) => {
+                        const product = await entry.saleItem.product.fetch();
+                        return {
+                            id: entry.saleItem.id,
+                            title: product?.name || "Item",
+                            qty: entry.saleItem.quantity,
+                            date: entry.sale?.soldAt
+                                ? new Date(
+                                      entry.sale.soldAt,
+                                  ).toLocaleDateString()
+                                : "",
+                            amount: entry.remainingBalance,
+                            saleItem: entry.saleItem,
+                        };
+                    }),
+                );
+                const paymentRows = await getCustomerPayments(id, 30);
+                const mappedPayments = paymentRows.map((payment) => ({
+                    id: payment.id,
+                    date: payment.paidAt
+                        ? new Date(payment.paidAt).toLocaleDateString()
+                        : "",
+                    amount: payment.totalAmount,
+                    receiptNo: payment.receiptNo || "-",
+                }));
+
+                if (!active) return;
+                setCustomer({
+                    id: record.id,
+                    name: record.name,
+                    phone: record.phone || "",
+                });
+                setUnpaidItems(enriched);
+                setPayments(mappedPayments);
+            } catch (error) {
+                console.error("Failed to load credit details", error);
+            } finally {
+                if (active) setLoading(false);
+            }
+        };
+
+        loadCustomer();
+
+        return () => {
+            active = false;
+        };
+    }, [id]);
+
+    const balance = useMemo(
+        () => unpaidItems.reduce((sum, item) => sum + item.amount, 0),
+        [unpaidItems],
     );
 
-    if (!customer) {
+    if (loading || !customer) {
         return (
             <>
                 <Stack.Screen
@@ -114,16 +105,25 @@ const CreditDetailsScreen = () => {
                 <Screen style={styles.container}>
                     <Card style={styles.card}>
                         <Card.Content style={{ gap: 8 }}>
-                            <Text style={styles.title}>Customer not found</Text>
-                            <Text style={styles.meta}>
-                                Select a customer from credits to view details.
+                            <Text style={styles.title}>
+                                {loading
+                                    ? "Loading customer…"
+                                    : "Customer not found"}
                             </Text>
-                            <Button
-                                mode="contained"
-                                onPress={() => router.back()}
-                            >
-                                Back to credits
-                            </Button>
+                            <Text style={styles.meta}>
+                                {loading
+                                    ? "Fetching credit details."
+                                    : "Select a customer from credits to view details."}
+                            </Text>
+                            {loading && <ActivityIndicator />}
+                            {!loading && (
+                                <Button
+                                    mode="contained"
+                                    onPress={() => router.back()}
+                                >
+                                    Back to credits
+                                </Button>
+                            )}
                         </Card.Content>
                     </Card>
                 </Screen>
@@ -145,11 +145,11 @@ const CreditDetailsScreen = () => {
             />
             <Screen contentContainerStyle={styles.container}>
                 <View style={styles.profileCard}>
-                    <InitialAvatar name={customer.name} size={72} />
+                    <InitialAvatar size={72} />
                     <Text style={styles.profileName}>{customer.name}</Text>
                     <Text style={styles.meta}>Total Outstanding Balance</Text>
                     <Text style={styles.balanceValue}>
-                        ETB {customer.balance.toLocaleString()}
+                        ETB {balance.toLocaleString()}
                     </Text>
                     <View style={styles.profileMetaRow}>
                         <Icon
@@ -202,7 +202,7 @@ const CreditDetailsScreen = () => {
 
                 {tab === "unpaid" && (
                     <ScrollView contentContainerStyle={{ gap: 12 }}>
-                        {customer.unpaidItems.length === 0 && (
+                        {unpaidItems.length === 0 && (
                             <Card style={styles.card}>
                                 <Card.Content>
                                     <Text style={styles.meta}>
@@ -211,7 +211,7 @@ const CreditDetailsScreen = () => {
                                 </Card.Content>
                             </Card>
                         )}
-                        {customer.unpaidItems.map((item) => (
+                        {unpaidItems.map((item) => (
                             <Card key={item.id} style={styles.card}>
                                 <Card.Content style={styles.itemRow}>
                                     <View style={styles.itemIcon}>
@@ -240,7 +240,7 @@ const CreditDetailsScreen = () => {
 
                 {tab === "payments" && (
                     <ScrollView contentContainerStyle={{ gap: 12 }}>
-                        {customer.payments.length === 0 && (
+                        {payments.length === 0 && (
                             <Card style={styles.card}>
                                 <Card.Content>
                                     <Text style={styles.meta}>
@@ -249,7 +249,7 @@ const CreditDetailsScreen = () => {
                                 </Card.Content>
                             </Card>
                         )}
-                        {customer.payments.map((payment) => (
+                        {payments.map((payment) => (
                             <Card key={payment.id} style={styles.card}>
                                 <Card.Content style={styles.paymentRow}>
                                     <View style={styles.itemIcon}>
@@ -265,6 +265,9 @@ const CreditDetailsScreen = () => {
                                         </Text>
                                         <Text style={styles.meta}>
                                             {payment.date}
+                                        </Text>
+                                        <Text style={styles.meta}>
+                                            Receipt: {payment.receiptNo}
                                         </Text>
                                     </View>
                                     <Text style={styles.itemAmount}>

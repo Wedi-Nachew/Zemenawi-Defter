@@ -13,6 +13,7 @@ const HomeScreen = () => {
     const [stats, setStats] = useState([]);
     const [lowStockItems, setLowStockItems] = useState([]);
     const [recentSales, setRecentSales] = useState([]);
+    const [error, setError] = useState("");
     const quickActions = useMemo(
         () => [
             {
@@ -38,6 +39,7 @@ const HomeScreen = () => {
 
         const loadDashboard = async () => {
             try {
+                setError("");
                 const summary = await getDashboardSummary({
                     lowStockThreshold: 5,
                     recentLimit: 5,
@@ -109,6 +111,9 @@ const HomeScreen = () => {
                 setRecentSales(recent);
             } catch (error) {
                 console.error("Failed to load dashboard", error);
+                if (active) {
+                    setError("Unable to load dashboard data.");
+                }
             }
         };
 
@@ -121,6 +126,11 @@ const HomeScreen = () => {
 
     return (
         <ScrollScreen style={styles.container}>
+            {!!error && (
+                <View style={styles.errorBanner}>
+                    <Text style={styles.errorText}>{error}</Text>
+                </View>
+            )}
             <View style={styles.statsRow}>
                 {stats.map((stat) => (
                     <StatCard key={stat.label} {...stat} />
@@ -284,6 +294,17 @@ const styles = StyleSheet.create({
     emptySubtitle: {
         color: theme.colors.onSurface,
         marginTop: 4,
+        fontSize: 12,
+    },
+    errorBanner: {
+        backgroundColor: "#FEE2E2",
+        borderRadius: 12,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: "#FCA5A5",
+    },
+    errorText: {
+        color: theme.colors.error,
         fontSize: 12,
     },
 });

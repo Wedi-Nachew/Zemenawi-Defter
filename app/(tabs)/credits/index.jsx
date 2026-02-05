@@ -1,7 +1,8 @@
 import { router, Stack } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FlatList, StyleSheet, View } from "react-native";
 import {
+    ActivityIndicator,
     Button,
     Card,
     Chip,
@@ -11,57 +12,54 @@ import {
 } from "react-native-paper";
 import InitialAvatar from "../../../src/components/InitialAvatar";
 import Screen from "../../../src/components/Screen";
+import { getCustomersWithBalances } from "../../../src/services/creditService";
 import theme from "../../../src/theme";
 
 const CustomerCreditsScreen = () => {
-    const customers = useMemo(
-        () => [
-            {
-                id: "c1",
-                name: "Abebe Kebede",
-                phone: "+251 911 234 567",
-                balance: 12500,
-            },
-            {
-                id: "c2",
-                name: "Sara Tesfaye",
-                phone: "+251 912 345 678",
-                balance: 8200,
-            },
-            {
-                id: "c3",
-                name: "Restaurant Tana",
-                phone: "+251 911 889 900",
-                balance: 1500,
-            },
-            {
-                id: "c4",
-                name: "Dawit Meles",
-                phone: "+251 900 112 233",
-                balance: 0,
-            },
-        ],
-        [],
-    );
-
     const [filter, setFilter] = useState("all");
     const [query, setQuery] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [customers, setCustomers] = useState([]);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        let active = true;
+
+        const loadCustomers = async () => {
+            setLoading(true);
+            try {
+                setError("");
+                const rows = await getCustomersWithBalances({
+                    search: query,
+                    filter,
+                });
+                if (!active) return;
+                setCustomers(
+                    rows.map(({ customer, balance }) => ({
+                        id: customer.id,
+                        name: customer.name,
+                        phone: customer.phone || "",
+                        balance,
+                    })),
+                );
+            } catch (error) {
+                console.error("Failed to load customers", error);
+                if (active) setError("Unable to load customers.");
+            } finally {
+                if (active) setLoading(false);
+            }
+        };
+
+        loadCustomers();
+
+        return () => {
+            active = false;
+        };
+    }, [filter, query]);
 
     const totalOutstanding = customers.reduce((sum, c) => sum + c.balance, 0);
 
-    const filteredCustomers = useMemo(() => {
-        const q = query.trim().toLowerCase();
-        return customers.filter((c) => {
-            const matchesQuery = q
-                ? c.name.toLowerCase().includes(q) || c.phone.includes(q)
-                : true;
-            const matchesFilter =
-                filter === "all" ||
-                (filter === "balance" && c.balance > 0) ||
-                (filter === "paid" && c.balance === 0);
-            return matchesQuery && matchesFilter;
-        });
-    }, [customers, filter, query]);
+    const filteredCustomers = useMemo(() => customers, [customers]);
 
     return (
         <>
@@ -170,69 +168,91 @@ const CustomerCreditsScreen = () => {
                     </Chip>
                 </View>
 
-                <FlatList
-                    data={filteredCustomers}
-                    keyExtractor={(item) => item.id}
-                    contentContainerStyle={{ gap: 12, paddingBottom: 28 }}
-                    renderItem={({ item }) => (
-                        <Card
-                            style={styles.card}
-                            onPress={() =>
-                                router.push({
-                                    pathname: "/(tabs)/credits/details",
-                                    params: { id: item.id },
-                                })
-                            }
-                        >
-                            <Card.Content style={styles.cardContent}>
-                                <View style={styles.customerRow}>
-                                    <InitialAvatar name={item.name} />
-                                    <View style={{ flex: 1 }}>
-                                        <Text
-                                            variant="titleMedium"
-                                            style={styles.cardTitle}
-                                        >
-                                            {item.name}
-                                        </Text>
-                                        <Text style={styles.subtitle}>
-                                            {item.phone}
-                                        </Text>
-                                    </View>
-                                    <View
-                                        style={{
-                                            alignItems: "flex-end",
-                                            gap: 6,
-                                        }}
-                                    >
-                                        <Text style={styles.balanceValue}>
-                                            ETB {item.balance.toLocaleString()}
-                                        </Text>
-                                        <Chip
-                                            compact
-                                            mode="outlined"
-                                            style={
-                                                item.balance > 0
-                                                    ? styles.balanceChip
-                                                    : styles.paidChip
-                                            }
-                                            textStyle={{
-                                                color:
-                                                    item.balance > 0
-                                                        ? theme.colors.error
-                                                        : theme.colors
-                                                              .secondary,
+                {loading ? (
+                    <Card style={styles.card}>
+                        <Card.Content style={styles.cardContent}>
+                            <ActivityIndicator />
+                            <Text style={styles.meta}>Loading credits…</Text>
+                        </Card.Content>
+                    </Card>
+                ) : error ? (
+                    <Card style={styles.card}>
+                        <Card.Content>
+                            <Text style={styles.errorText}>{error}</Text>
+                        </Card.Content>
+                    </Card>
+                ) : filteredCustomers.length === 0 ? (
+                    <Card style={styles.card}>
+                        <Card.Content>
+                            <Text style={styles.meta}>No customers found.</Text>
+                        </Card.Content>
+                    </Card>
+                ) : (
+                    <FlatList
+                        data={filteredCustomers}
+                        keyExtractor={(item) => item.id}
+                        contentContainerStyle={{ gap: 12, paddingBottom: 28 }}
+                        renderItem={({ item }) => (
+                            <Card
+                                style={styles.card}
+                                onPress={() =>
+                                    router.push({
+                                        pathname: "/(tabs)/credits/details",
+                                        params: { id: item.id },
+                                    })
+                                }
+                            >
+                                <Card.Content style={styles.cardContent}>
+                                    <View style={styles.customerRow}>
+                                        <InitialAvatar size={40} />
+                                        <View style={{ flex: 1 }}>
+                                            <Text
+                                                variant="titleMedium"
+                                                style={styles.cardTitle}
+                                            >
+                                                {item.name}
+                                            </Text>
+                                            <Text style={styles.subtitle}>
+                                                {item.phone}
+                                            </Text>
+                                        </View>
+                                        <View
+                                            style={{
+                                                alignItems: "flex-end",
+                                                gap: 6,
                                             }}
                                         >
-                                            {item.balance > 0
-                                                ? "Has Balance"
-                                                : "Paid"}
-                                        </Chip>
+                                            <Text style={styles.balanceValue}>
+                                                ETB{" "}
+                                                {item.balance.toLocaleString()}
+                                            </Text>
+                                            <Chip
+                                                compact
+                                                mode="outlined"
+                                                style={
+                                                    item.balance > 0
+                                                        ? styles.balanceChip
+                                                        : styles.paidChip
+                                                }
+                                                textStyle={{
+                                                    color:
+                                                        item.balance > 0
+                                                            ? theme.colors.error
+                                                            : theme.colors
+                                                                  .secondary,
+                                                }}
+                                            >
+                                                {item.balance > 0
+                                                    ? "Has Balance"
+                                                    : "Paid"}
+                                            </Chip>
+                                        </View>
                                     </View>
-                                </View>
-                            </Card.Content>
-                        </Card>
-                    )}
-                />
+                                </Card.Content>
+                            </Card>
+                        )}
+                    />
+                )}
             </Screen>
         </>
     );
@@ -248,6 +268,10 @@ const styles = StyleSheet.create({
     title: {
         color: theme.colors.text,
         fontWeight: "700",
+    },
+    meta: {
+        color: theme.colors.onSurface,
+        fontSize: 12,
     },
     subtitle: {
         color: theme.colors.onSurface,
@@ -306,6 +330,10 @@ const styles = StyleSheet.create({
     balanceValue: {
         color: theme.colors.text,
         fontWeight: "700",
+    },
+    errorText: {
+        color: theme.colors.error,
+        fontSize: 12,
     },
     balanceChip: {
         borderColor: "#FEE2E2",

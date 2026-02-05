@@ -17,6 +17,7 @@ import theme from "../../../src/theme";
 const ProductsScreen = () => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
 
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState("all");
@@ -25,6 +26,7 @@ const ProductsScreen = () => {
         let active = true;
         setLoading(true);
         try {
+            setError("");
             const result = await getProducts({
                 search: query.trim(),
                 filter,
@@ -33,6 +35,7 @@ const ProductsScreen = () => {
             setProducts(result);
         } catch (error) {
             console.error("Failed to load products", error);
+            if (active) setError("Unable to load products.");
         } finally {
             if (active) setLoading(false);
         }
@@ -208,6 +211,12 @@ const ProductsScreen = () => {
 
                 <Divider style={styles.divider} />
 
+                {!!error && (
+                    <View style={styles.errorBanner}>
+                        <Text style={styles.errorText}>{error}</Text>
+                    </View>
+                )}
+
                 <FlatList
                     data={products}
                     keyExtractor={(item) => item.id}
@@ -368,6 +377,18 @@ const styles = StyleSheet.create({
     emptySubtitle: {
         color: theme.colors.onSurface,
         marginTop: 4,
+        fontSize: 12,
+    },
+    errorBanner: {
+        backgroundColor: "#FEE2E2",
+        borderRadius: 12,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: "#FCA5A5",
+        marginBottom: 8,
+    },
+    errorText: {
+        color: theme.colors.error,
         fontSize: 12,
     },
 });

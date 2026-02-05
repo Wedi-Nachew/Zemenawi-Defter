@@ -20,10 +20,12 @@ const SalesScreen = () => {
 
     const [sections, setSections] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
 
     const loadSales = useCallback(async () => {
         setLoading(true);
         try {
+            setError("");
             const typeFilter =
                 filter === "cash" || filter === "credit" ? filter : "all";
             const sales = await getSales({ search: query, type: typeFilter });
@@ -89,6 +91,7 @@ const SalesScreen = () => {
         } catch (error) {
             console.error("Failed to load sales", error);
             setSections([]);
+            setError("Unable to load sales.");
         } finally {
             setLoading(false);
         }
@@ -211,6 +214,11 @@ const SalesScreen = () => {
                 </View>
 
                 <ScrollView>
+                    {!!error && (
+                        <View style={styles.errorBanner}>
+                            <Text style={styles.errorText}>{error}</Text>
+                        </View>
+                    )}
                     {loading && (
                         <View style={styles.emptyState}>
                             <ActivityIndicator animating />
@@ -368,6 +376,18 @@ const styles = StyleSheet.create({
     title: {
         color: theme.colors.text,
         fontWeight: "700",
+    },
+    errorBanner: {
+        backgroundColor: "#FEE2E2",
+        borderRadius: 12,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: "#FCA5A5",
+        marginBottom: 12,
+    },
+    errorText: {
+        color: theme.colors.error,
+        fontSize: 12,
     },
     search: {
         borderRadius: 24,

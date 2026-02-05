@@ -7,6 +7,14 @@ const creditPaymentItemsCollection = database.collections.get(
 );
 const customerCollection = database.collections.get("customers");
 
+const generateReceiptNo = () => {
+    const timestamp = Date.now();
+    const rand = Math.floor(Math.random() * 1000)
+        .toString()
+        .padStart(3, "0");
+    return `ZD-${timestamp}-${rand}`;
+};
+
 /**
  * Pay toward specific credit sale items
  *
@@ -34,11 +42,13 @@ const payTowardSaleItems = async (customer, items, paidAt = Date.now()) => {
     const totalAmount = items.reduce((sum, i) => sum + i.amount, 0);
 
     return database.write(async () => {
+        const receiptNo = generateReceiptNo();
         // 1. Create the credit payment record
         const payment = await creditPaymentsCollection.create((p) => {
             p.customer.set(customer);
             p.totalAmount = totalAmount;
             p.paidAt = paidAt;
+            p.receiptNo = receiptNo;
             p.updatedAt = Date.now();
         });
 
