@@ -167,8 +167,22 @@ const getSaleItems = async (saleId) => {
     return await saleItemCollection.query(Q.where("sale_id", saleId)).fetch();
 };
 
+const deleteSale = async (saleId) => {
+    return await database.write(async () => {
+        const sale = await saleCollection.find(saleId);
+        const items = await getSaleItems(saleId);
+
+        for (const item of items) {
+            await item.markAsDeleted();
+        }
+
+        await sale.markAsDeleted();
+    });
+};
+
 export {
     createSale,
+    deleteSale,
     getRecentSales,
     getSaleById,
     getSaleItems,
