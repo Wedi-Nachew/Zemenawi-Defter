@@ -1,7 +1,8 @@
-import { Stack } from "expo-router";
-import { useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { router, Stack, useFocusEffect } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
 import {
+    ActivityIndicator,
     Button,
     Card,
     Chip,
@@ -14,17 +15,20 @@ import {
     TouchableRipple,
 } from "react-native-paper";
 import FormScreen from "../../../src/components/FormScreen";
+import { getCustomersWithBalances } from "../../../src/services/creditService";
+import { createCustomer } from "../../../src/services/customerService";
+import { getProducts } from "../../../src/services/productService";
+import { createSale } from "../../../src/services/saleService";
 import theme from "../../../src/theme";
 
 const NewSaleScreen = () => {
     const [query, setQuery] = useState("");
     const [paymentMethod, setPaymentMethod] = useState("cash");
-    const [paidAmount, setPaidAmount] = useState("3100");
-    const [cartItems, setCartItems] = useState([
-        { id: "c1", name: "Teff Flour (10kg)", price: 1200, qty: 1 },
-        { id: "c2", name: "Cooking Oil (5L)", price: 950, qty: 2 },
-    ]);
+    const [paidAmount, setPaidAmount] = useState("");
+    const [cartItems, setCartItems] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [customers, setCustomers] = useState([]);
+    const [products, setProducts] = useState([]);
     const [customerModalVisible, setCustomerModalVisible] = useState(false);
     const [customerQuery, setCustomerQuery] = useState("");
     const [addCustomerVisible, setAddCustomerVisible] = useState(false);
@@ -37,37 +41,39 @@ const NewSaleScreen = () => {
     const [editItem, setEditItem] = useState(null);
     const [editQty, setEditQty] = useState("1");
     const [editPrice, setEditPrice] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [errorMessage, setErrorMessage] = useState("");
 
-    const [customers, setCustomers] = useState([
-        {
-            id: "cust1",
-            name: "Abebe Bikila",
-            phone: "+251 911 222 333",
-            balance: 4250,
-        },
-        {
-            id: "cust2",
-            name: "Mekdes Tadesse",
-            phone: "+251 912 334 455",
-            balance: 0,
-        },
-        {
-            id: "cust3",
-            name: "Samuel Tesfaye",
-            phone: "+251 900 556 677",
-            balance: 1280,
-        },
-    ]);
+    const loadData = useCallback(async () => {
+        setLoading(true);
+        try {
+            const [productRows, customerRows] = await Promise.all([
+                getProducts(),
+                getCustomersWithBalances(),
+            ]);
 
-    const products = useMemo(
-        () => [
-            { id: "p1", name: "Teff Flour (10kg)", price: 1200 },
-            { id: "p2", name: "Cooking Oil (5L)", price: 950 },
-            { id: "p3", name: "Sugar (5kg)", price: 820 },
-            { id: "p4", name: "Rice (10kg)", price: 1050 },
-            { id: "p5", name: "Laundry Soap (1kg)", price: 260 },
-        ],
-        [],
+            setProducts(productRows);
+            setCustomers(
+                customerRows.map(({ customer, balance }) => ({
+                    id: customer.id,
+                    name: customer.name,
+                    phone: customer.phone || "",
+                    balance,
+                    model: customer,
+                })),
+            );
+        } catch (error) {
+            console.error("Failed to load sales data", error);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            loadData();
+        }, [loadData]),
     );
 
     const filteredProducts = useMemo(() => {
@@ -105,7 +111,7 @@ const NewSaleScreen = () => {
     const handleSelectProduct = (product) => {
         setSelectedProduct(product);
         setAddQty("1");
-        setAddPrice(String(product.price));
+        setAddPrice(String(product.defaultSellingPrice ?? 0));
     };
 
     const handleAddToCart = () => {
@@ -115,10 +121,12 @@ const NewSaleScreen = () => {
         const qty = Math.max(1, Number(addQty) || 1);
         const price = Math.max(0, Number(addPrice) || 0);
         setCartItems((prev) => {
-            const existing = prev.find((row) => row.id === selectedProduct.id);
+            const existing = prev.find(
+                (row) => row.productId === selectedProduct.id,
+            );
             if (existing) {
                 return prev.map((row) =>
-                    row.id === selectedProduct.id
+                    row.productId === selectedProduct.id
                         ? { ...row, qty: row.qty + qty, price }
                         : row,
                 );
@@ -126,7 +134,9 @@ const NewSaleScreen = () => {
             return [
                 ...prev,
                 {
-                    id: selectedProduct.id,
+                    id: `${selectedProduct.id}-${Date.now()}`,
+                    productId: selectedProduct.id,
+                    product: selectedProduct,
                     name: selectedProduct.name,
                     price,
                     qty,
@@ -165,22 +175,80 @@ const NewSaleScreen = () => {
         setCustomerModalVisible(false);
     };
 
-    const handleAddCustomer = () => {
+    const handleAddCustomer = async () => {
         if (!newCustomerName.trim() || !newCustomerPhone.trim()) {
             return;
         }
-        const newCustomer = {
-            id: `cust-${Date.now()}`,
-            name: newCustomerName.trim(),
-            phone: newCustomerPhone.trim(),
-            balance: 0,
-        };
-        setCustomers((prev) => [newCustomer, ...prev]);
-        setSelectedCustomer(newCustomer);
-        setNewCustomerName("");
-        setNewCustomerPhone("");
-        setAddCustomerVisible(false);
-        setCustomerModalVisible(false);
+        try {
+            const created = await createCustomer({
+                name: newCustomerName,
+                phone: newCustomerPhone,
+            });
+            const newCustomer = {
+                id: created.id,
+                name: created.name,
+                phone: created.phone || "",
+                balance: 0,
+                model: created,
+            };
+            setCustomers((prev) => [newCustomer, ...prev]);
+            setSelectedCustomer(newCustomer);
+            setNewCustomerName("");
+            setNewCustomerPhone("");
+            setAddCustomerVisible(false);
+            setCustomerModalVisible(false);
+        } catch (error) {
+            console.error("Failed to add customer", error);
+        }
+    };
+
+    const handleSubmitSale = async () => {
+        if (cartItems.length === 0) {
+            setErrorMessage("Add at least one product.");
+            return;
+        }
+
+        const parsedPaid = Number(String(paidAmount).replace(/,/g, "")) || 0;
+        const total = totals.total;
+
+        if (paymentMethod === "credit" && !selectedCustomer) {
+            setErrorMessage("Customer is required for credit sales.");
+            return;
+        }
+
+        setErrorMessage("");
+        setSaving(true);
+
+        try {
+            const items = cartItems.map((item) => ({
+                product: item.product,
+                quantity: item.qty,
+                sellingPrice: item.price,
+            }));
+
+            const saleType =
+                paymentMethod === "cash" || parsedPaid >= total
+                    ? "cash"
+                    : "credit";
+
+            const initialPayment =
+                saleType === "credit" && parsedPaid > 0 ? parsedPaid : null;
+
+            await createSale(
+                selectedCustomer?.model || null,
+                saleType,
+                items,
+                Date.now(),
+                initialPayment,
+            );
+
+            router.back();
+        } catch (error) {
+            console.error("Failed to create sale", error);
+            setErrorMessage("Unable to complete sale.");
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -226,7 +294,14 @@ const NewSaleScreen = () => {
                             autoFocus
                         />
                         <View style={styles.modalList}>
-                            {filteredProducts.length === 0 ? (
+                            {loading ? (
+                                <View style={styles.modalLoading}>
+                                    <ActivityIndicator animating />
+                                    <Text style={styles.modalEmpty}>
+                                        Loading products…
+                                    </Text>
+                                </View>
+                            ) : filteredProducts.length === 0 ? (
                                 <Text style={styles.modalEmpty}>
                                     No matches
                                 </Text>
@@ -245,7 +320,7 @@ const NewSaleScreen = () => {
                                                 {product.name}
                                             </Text>
                                             <Text style={styles.modalPrice}>
-                                                {product.price.toLocaleString()}{" "}
+                                                {product.defaultSellingPrice.toLocaleString()}{" "}
                                                 ETB
                                             </Text>
                                         </View>
@@ -412,23 +487,30 @@ const NewSaleScreen = () => {
                 </View>
                 <Card style={styles.card}>
                     <Card.Content style={{ gap: 12 }}>
-                        <View style={styles.customerRow}>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.itemName}>
-                                    {selectedCustomer?.name ??
-                                        "Select customer"}
-                                </Text>
-                                <Text style={styles.itemMeta}>
-                                    {selectedCustomer?.phone ??
-                                        "Customer phone"}
-                                </Text>
+                        <TouchableRipple
+                            onPress={() => setCustomerModalVisible(true)}
+                            style={styles.customerPressable}
+                        >
+                            <View style={styles.customerRow}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.itemName}>
+                                        {selectedCustomer?.name ??
+                                            "Select customer"}
+                                    </Text>
+                                    <Text style={styles.itemMeta}>
+                                        {selectedCustomer?.phone ??
+                                            "Customer phone"}
+                                    </Text>
+                                </View>
+                                <IconButton
+                                    icon="account-search-outline"
+                                    size={20}
+                                    onPress={() =>
+                                        setCustomerModalVisible(true)
+                                    }
+                                />
                             </View>
-                            <Icon
-                                source="account-search-outline"
-                                size={20}
-                                color={theme.colors.onSurface}
-                            />
-                        </View>
+                        </TouchableRipple>
                         {paymentMethod === "credit" && !selectedCustomer && (
                             <View style={styles.alertPill}>
                                 <Icon
@@ -529,7 +611,7 @@ const NewSaleScreen = () => {
                                 right={<TextInput.Affix text="ETB" />}
                             />
                             <Text style={styles.helperText}>
-                                Subtotal: 3,100.00 ETB
+                                Subtotal: {totals.total.toLocaleString()} ETB
                             </Text>
                         </View>
                     </Card.Content>
@@ -559,10 +641,15 @@ const NewSaleScreen = () => {
                     mode="contained"
                     icon="check"
                     style={styles.submitButton}
-                    onPress={() => {}}
+                    onPress={handleSubmitSale}
+                    loading={saving}
+                    disabled={saving}
                 >
                     Complete Sale
                 </Button>
+                {!!errorMessage && (
+                    <Text style={styles.errorText}>{errorMessage}</Text>
+                )}
             </View>
 
             <Portal>
@@ -572,93 +659,115 @@ const NewSaleScreen = () => {
                     style={styles.modalBottom}
                     contentContainerStyle={styles.modalContainer}
                 >
-                    <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Select Customer</Text>
-                        <IconButton
-                            icon="close"
-                            size={20}
-                            onPress={() => setCustomerModalVisible(false)}
-                        />
-                    </View>
-                    <TextInput
-                        mode="outlined"
-                        value={customerQuery}
-                        onChangeText={setCustomerQuery}
-                        placeholder="Search customers..."
-                        outlineColor="#E5E7EB"
-                        activeOutlineColor={theme.colors.primary}
-                        style={styles.search}
-                        left={<TextInput.Icon icon="magnify" />}
-                    />
-                    <View style={styles.modalList}>
-                        {filteredCustomers.length === 0 ? (
-                            <Text style={styles.modalEmpty}>
-                                No customers found
+                    <ScrollView
+                        contentContainerStyle={styles.modalScroll}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>
+                                Select Customer
                             </Text>
-                        ) : (
-                            filteredCustomers.map((customer) => (
-                                <TouchableRipple
-                                    key={customer.id}
-                                    onPress={() =>
-                                        handleSelectCustomer(customer)
-                                    }
-                                    borderless
-                                    style={styles.suggestionRow}
-                                >
-                                    <View style={styles.modalItemRow}>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={styles.suggestionText}>
-                                                {customer.name}
-                                            </Text>
-                                            <Text style={styles.modalSubText}>
-                                                {customer.phone}
+                            <IconButton
+                                icon="close"
+                                size={20}
+                                onPress={() => setCustomerModalVisible(false)}
+                            />
+                        </View>
+                        <TextInput
+                            mode="outlined"
+                            value={customerQuery}
+                            onChangeText={setCustomerQuery}
+                            placeholder="Search customers..."
+                            outlineColor="#E5E7EB"
+                            activeOutlineColor={theme.colors.primary}
+                            style={styles.search}
+                            left={<TextInput.Icon icon="magnify" />}
+                        />
+                        <View style={styles.modalList}>
+                            {loading ? (
+                                <View style={styles.modalLoading}>
+                                    <ActivityIndicator animating />
+                                    <Text style={styles.modalEmpty}>
+                                        Loading customers…
+                                    </Text>
+                                </View>
+                            ) : filteredCustomers.length === 0 ? (
+                                <Text style={styles.modalEmpty}>
+                                    No customers found
+                                </Text>
+                            ) : (
+                                filteredCustomers.map((customer) => (
+                                    <TouchableRipple
+                                        key={customer.id}
+                                        onPress={() =>
+                                            handleSelectCustomer(customer)
+                                        }
+                                        borderless
+                                        style={styles.suggestionRow}
+                                    >
+                                        <View style={styles.modalItemRow}>
+                                            <View style={{ flex: 1 }}>
+                                                <Text
+                                                    style={
+                                                        styles.suggestionText
+                                                    }
+                                                >
+                                                    {customer.name}
+                                                </Text>
+                                                <Text
+                                                    style={styles.modalSubText}
+                                                >
+                                                    {customer.phone}
+                                                </Text>
+                                            </View>
+                                            <Text style={styles.modalPrice}>
+                                                ETB{" "}
+                                                {customer.balance.toLocaleString()}
                                             </Text>
                                         </View>
-                                        <Text style={styles.modalPrice}>
-                                            ETB{" "}
-                                            {customer.balance.toLocaleString()}
-                                        </Text>
-                                    </View>
-                                </TouchableRipple>
-                            ))
-                        )}
-                    </View>
-                    <Button
-                        mode="outlined"
-                        icon="account-plus-outline"
-                        onPress={() => setAddCustomerVisible((prev) => !prev)}
-                        style={styles.addCustomerButton}
-                    >
-                        Add New Customer
-                    </Button>
-                    {addCustomerVisible && (
-                        <View style={styles.modalEditor}>
-                            <Text style={styles.modalSectionTitle}>
-                                New Customer
-                            </Text>
-                            <TextInput
-                                mode="outlined"
-                                label="Full Name"
-                                value={newCustomerName}
-                                onChangeText={setNewCustomerName}
-                                style={styles.modalField}
-                            />
-                            <TextInput
-                                mode="outlined"
-                                label="Phone"
-                                value={newCustomerPhone}
-                                onChangeText={setNewCustomerPhone}
-                                keyboardType="phone-pad"
-                                style={styles.modalField}
-                            />
-                            <Button
-                                mode="contained"
-                                onPress={handleAddCustomer}
-                            >
-                                Save Customer
-                            </Button>
+                                    </TouchableRipple>
+                                ))
+                            )}
                         </View>
-                    )}
+                        <Button
+                            mode="outlined"
+                            icon="account-plus-outline"
+                            onPress={() =>
+                                setAddCustomerVisible((prev) => !prev)
+                            }
+                            style={styles.addCustomerButton}
+                        >
+                            {addCustomerVisible ? "Close" : "Add New Customer"}
+                        </Button>
+                        {addCustomerVisible && (
+                            <View style={styles.modalEditor}>
+                                <Text style={styles.modalSectionTitle}>
+                                    New Customer
+                                </Text>
+                                <TextInput
+                                    mode="outlined"
+                                    label="Full Name"
+                                    value={newCustomerName}
+                                    onChangeText={setNewCustomerName}
+                                    style={styles.modalField}
+                                />
+                                <TextInput
+                                    mode="outlined"
+                                    label="Phone"
+                                    value={newCustomerPhone}
+                                    onChangeText={setNewCustomerPhone}
+                                    keyboardType="phone-pad"
+                                    style={styles.modalField}
+                                />
+                                <Button
+                                    mode="contained"
+                                    onPress={handleAddCustomer}
+                                >
+                                    Save Customer
+                                </Button>
+                            </View>
+                        )}
+                    </ScrollView>
                 </Modal>
             </Portal>
         </>
@@ -747,6 +856,10 @@ const styles = StyleSheet.create({
         padding: 16,
         paddingBottom: 24,
     },
+    modalScroll: {
+        paddingBottom: 8,
+        gap: 12,
+    },
     modalBottom: {
         justifyContent: "flex-end",
         margin: 0,
@@ -785,6 +898,11 @@ const styles = StyleSheet.create({
         color: theme.colors.onSurface,
         fontSize: 12,
         textAlign: "center",
+        paddingVertical: 12,
+    },
+    modalLoading: {
+        alignItems: "center",
+        gap: 8,
         paddingVertical: 12,
     },
     modalEditor: {
@@ -868,6 +986,9 @@ const styles = StyleSheet.create({
         justifyContent: "space-between",
         alignItems: "center",
     },
+    customerPressable: {
+        borderRadius: 12,
+    },
     alertPill: {
         flexDirection: "row",
         alignItems: "center",
@@ -929,6 +1050,12 @@ const styles = StyleSheet.create({
         marginTop: "auto",
         paddingTop: 16,
         paddingHorizontal: 16,
+    },
+    errorText: {
+        color: theme.colors.error,
+        fontSize: 12,
+        textAlign: "center",
+        marginTop: 8,
     },
 });
 

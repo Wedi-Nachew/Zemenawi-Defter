@@ -1,7 +1,7 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { Button, Card, Chip, Icon, IconButton, Text } from "react-native-paper";
+import { Button, Card, Chip, Icon, Text } from "react-native-paper";
 import InitialAvatar from "../../../src/components/InitialAvatar";
 import Screen from "../../../src/components/Screen";
 import theme from "../../../src/theme";
@@ -100,29 +100,34 @@ const CreditDetailsScreen = () => {
 
     if (!customer) {
         return (
-            <Screen contentContainerStyle={styles.container}>
-                <View style={styles.headerRow}>
-                    <IconButton
-                        icon="arrow-left"
-                        onPress={() => router.back()}
-                    />
-                    <Text variant="titleMedium" style={styles.title}>
-                        Credit Details
-                    </Text>
-                    <View style={{ width: 40 }} />
-                </View>
-                <Card style={styles.card}>
-                    <Card.Content style={{ gap: 8 }}>
-                        <Text style={styles.title}>Customer not found</Text>
-                        <Text style={styles.meta}>
-                            Select a customer from credits to view details.
-                        </Text>
-                        <Button mode="contained" onPress={() => router.back()}>
-                            Back to credits
-                        </Button>
-                    </Card.Content>
-                </Card>
-            </Screen>
+            <>
+                <Stack.Screen
+                    options={{
+                        headerTitle: "Credit Details",
+                        headerTitleStyle: {
+                            fontWeight: "700",
+                            fontSize: 20,
+                        },
+                        headerTitleAlign: "center",
+                    }}
+                />
+                <Screen style={styles.container}>
+                    <Card style={styles.card}>
+                        <Card.Content style={{ gap: 8 }}>
+                            <Text style={styles.title}>Customer not found</Text>
+                            <Text style={styles.meta}>
+                                Select a customer from credits to view details.
+                            </Text>
+                            <Button
+                                mode="contained"
+                                onPress={() => router.back()}
+                            >
+                                Back to credits
+                            </Button>
+                        </Card.Content>
+                    </Card>
+                </Screen>
+            </>
         );
     }
 

@@ -1,7 +1,8 @@
-import { router, Stack } from "expo-router";
-import { useMemo, useState } from "react";
+import { router, Stack, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import {
+    ActivityIndicator,
     Card,
     Chip,
     Icon,
@@ -10,88 +11,98 @@ import {
     Text,
 } from "react-native-paper";
 import Screen from "../../../src/components/Screen";
+import { getSales } from "../../../src/services/saleService";
 import theme from "../../../src/theme";
 
 const SalesScreen = () => {
     const [filter, setFilter] = useState("all");
     const [query, setQuery] = useState("");
 
-    const sections = useMemo(
-        () => [
-            {
-                title: "Today, Oct 24",
-                items: [
-                    {
-                        id: "s1",
-                        customer: "Abebe Kebede",
-                        amount: 4500,
-                        profit: 900,
-                        tag: "Credit",
-                        status: "credit",
-                        time: "10:30 AM",
-                        receipt: "#ZM-9042",
-                    },
-                    {
-                        id: "s2",
-                        customer: "Walking Customer",
-                        amount: 1200,
-                        profit: 300,
-                        tag: "Paid",
-                        status: "paid",
-                        time: "09:15 AM",
-                        receipt: "#ZM-9041",
-                    },
-                ],
-            },
-            {
-                title: "Yesterday, Oct 23",
-                items: [
-                    {
-                        id: "s3",
-                        customer: "Selamawit G.",
-                        amount: 8900,
-                        profit: -500,
-                        tag: "Partial",
-                        status: "partial",
-                        time: "04:15 PM",
-                        receipt: "#ZM-9038",
-                    },
-                    {
-                        id: "s4",
-                        customer: "Kaleb Tadesse",
-                        amount: 550,
-                        profit: 120,
-                        tag: "Paid",
-                        status: "paid",
-                        time: "11:20 AM",
-                        receipt: "#ZM-9035",
-                    },
-                ],
-            },
-        ],
-        [],
-    );
+    const [sections, setSections] = useState([]);
+    const [loading, setLoading] = useState(false);
 
-    const filteredSections = useMemo(() => {
-        const q = query.trim().toLowerCase();
-        return sections
-            .map((section) => {
-                const items = section.items.filter((item) => {
-                    const matchesQuery = q
-                        ? item.customer.toLowerCase().includes(q) ||
-                          item.receipt.toLowerCase().includes(q)
-                        : true;
-                    const matchesFilter =
-                        filter === "all" ||
-                        (filter === "cash" && item.status === "paid") ||
-                        (filter === "credit" && item.status === "credit") ||
-                        (filter === "partial" && item.status === "partial");
-                    return matchesQuery && matchesFilter;
-                });
-                return { ...section, items };
-            })
-            .filter((section) => section.items.length > 0);
-    }, [filter, query, sections]);
+    const loadSales = useCallback(async () => {
+        setLoading(true);
+        try {
+            const typeFilter =
+                filter === "cash" || filter === "credit" ? filter : "all";
+            const sales = await getSales({ search: query, type: typeFilter });
+
+            const items = await Promise.all(
+                sales.map(async (sale) => {
+                    const saleItems = await sale.saleItems.fetch();
+                    const amount = saleItems.reduce(
+                        (sum, item) => sum + item.quantity * item.sellingPrice,
+                        0,
+                    );
+                    const profit = saleItems.reduce(
+                        (sum, item) =>
+                            sum +
+                            (item.sellingPrice - item.costPrice) *
+                                item.quantity,
+                        0,
+                    );
+                    const customer = sale.customerId
+                        ? await sale.customer.fetch()
+                        : null;
+                    const soldAt = sale.soldAt
+                        ? new Date(sale.soldAt)
+                        : new Date();
+                    const dateLabel = soldAt.toLocaleDateString();
+                    const timeLabel = soldAt.toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                    });
+                    const status =
+                        sale.type === "credit" && amount > 0
+                            ? "credit"
+                            : "paid";
+
+                    return {
+                        id: sale.id,
+                        customer: customer?.name || "Walk-in",
+                        amount,
+                        profit,
+                        tag: sale.type === "credit" ? "Credit" : "Paid",
+                        status,
+                        time: timeLabel,
+                        receipt: sale.id.slice(0, 8).toUpperCase(),
+                        dateLabel,
+                    };
+                }),
+            );
+
+            const grouped = items.reduce((acc, item) => {
+                if (!acc[item.dateLabel]) acc[item.dateLabel] = [];
+                acc[item.dateLabel].push(item);
+                return acc;
+            }, {});
+
+            const nextSections = Object.entries(grouped).map(
+                ([title, list]) => ({
+                    title,
+                    items: list,
+                }),
+            );
+
+            setSections(nextSections);
+        } catch (error) {
+            console.error("Failed to load sales", error);
+            setSections([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [filter, query]);
+
+    useEffect(() => {
+        loadSales();
+    }, [loadSales]);
+
+    useFocusEffect(
+        useCallback(() => {
+            loadSales();
+        }, [loadSales]),
+    );
 
     return (
         <>
@@ -200,7 +211,21 @@ const SalesScreen = () => {
                 </View>
 
                 <ScrollView>
-                    {filteredSections.map((section) => (
+                    {loading && (
+                        <View style={styles.emptyState}>
+                            <ActivityIndicator animating />
+                            <Text style={styles.meta}>Loading sales…</Text>
+                        </View>
+                    )}
+                    {!loading && sections.length === 0 && (
+                        <View style={styles.emptyState}>
+                            <Text style={styles.emptyTitle}>No sales yet</Text>
+                            <Text style={styles.meta}>
+                                Sales will appear here once recorded.
+                            </Text>
+                        </View>
+                    )}
+                    {sections.map((section) => (
                         <View key={section.title} style={{ gap: 12 }}>
                             <Text style={styles.sectionTitle}>
                                 {section.title}
@@ -417,6 +442,15 @@ const styles = StyleSheet.create({
         fontSize: 11,
         fontWeight: "700",
         textTransform: "uppercase",
+    },
+    emptyState: {
+        paddingVertical: 24,
+        alignItems: "center",
+        gap: 10,
+    },
+    emptyTitle: {
+        color: theme.colors.text,
+        fontWeight: "700",
     },
 });
 
