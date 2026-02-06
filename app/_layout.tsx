@@ -4,22 +4,23 @@ import {
     Inter_600SemiBold,
     Inter_700Bold,
 } from "@expo-google-fonts/inter";
+import {
+    NotoSansEthiopic_400Regular,
+    NotoSansEthiopic_500Medium,
+    NotoSansEthiopic_600SemiBold,
+    NotoSansEthiopic_700Bold,
+} from "@expo-google-fonts/noto-sans-ethiopic";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "react-native";
 import { PaperProvider } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import theme from "../src/theme/index";
+import { LanguageProvider, useLanguage } from "../src/i18n/LanguageContext";
+import { buildTheme } from "../src/theme/index";
 
-export default function RootLayout() {
-    const [fontLoaded] = useFonts({
-        Inter_400Regular,
-        Inter_500Medium,
-        Inter_600SemiBold,
-        Inter_700Bold,
-    });
-
-    if (!fontLoaded) return null;
+const AppShell = () => {
+    const { language } = useLanguage();
+    const theme = buildTheme(language);
 
     return (
         <SafeAreaProvider>
@@ -28,5 +29,26 @@ export default function RootLayout() {
                 <Stack screenOptions={{ headerShown: false }} />
             </PaperProvider>
         </SafeAreaProvider>
+    );
+};
+
+export default function RootLayout() {
+    const [fontLoaded] = useFonts({
+        Inter_400Regular,
+        Inter_500Medium,
+        Inter_600SemiBold,
+        Inter_700Bold,
+        NotoSansEthiopic_400Regular,
+        NotoSansEthiopic_500Medium,
+        NotoSansEthiopic_600SemiBold,
+        NotoSansEthiopic_700Bold,
+    });
+
+    if (!fontLoaded) return null;
+
+    return (
+        <LanguageProvider>
+            <AppShell />
+        </LanguageProvider>
     );
 }

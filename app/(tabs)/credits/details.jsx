@@ -1,5 +1,6 @@
+import { Q } from "@nozbe/watermelondb";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import {
     ActivityIndicator,
@@ -11,6 +12,9 @@ import {
 } from "react-native-paper";
 import InitialAvatar from "../../../src/components/InitialAvatar";
 import Screen from "../../../src/components/Screen";
+import database from "../../../src/database";
+import i18n from "../../../src/i18n";
+import { useLanguage } from "../../../src/i18n/LanguageContext";
 import {
     getCustomerById,
     getCustomerPayments,
@@ -19,70 +23,100 @@ import {
 import theme from "../../../src/theme";
 
 const CreditDetailsScreen = () => {
+    const { language } = useLanguage();
+    const locale = language === "ti" ? "ti-ET" : "en";
+    const currencyPrefix = i18n.t("common.currency.prefix");
     const { id } = useLocalSearchParams();
     const [tab, setTab] = useState("unpaid");
     const [customer, setCustomer] = useState(null);
     const [unpaidItems, setUnpaidItems] = useState([]);
     const [payments, setPayments] = useState([]);
     const [loading, setLoading] = useState(false);
+    const isMounted = useRef(true);
+
+    const loadCustomer = useCallback(async () => {
+        if (typeof id !== "string") return;
+        setLoading(true);
+        try {
+            const record = await getCustomerById(id);
+            const unpaid = await getCustomerUnpaidItems(record);
+            const enriched = await Promise.all(
+                unpaid.map(async (entry) => {
+                    const product = await entry.saleItem.product.fetch();
+                    return {
+                        id: entry.saleItem.id,
+                        title: product?.name || i18n.t("common.labels.item"),
+                        qty: entry.saleItem.quantity,
+                        date: entry.sale?.soldAt
+                            ? new Date(entry.sale.soldAt).toLocaleDateString(
+                                  locale,
+                              )
+                            : "",
+                        amount: entry.remainingBalance,
+                        saleItem: entry.saleItem,
+                    };
+                }),
+            );
+            const paymentRows = await getCustomerPayments(id, 30);
+            const mappedPayments = paymentRows.map((payment) => ({
+                id: payment.id,
+                date: payment.paidAt
+                    ? new Date(payment.paidAt).toLocaleDateString(locale)
+                    : "",
+                amount: payment.totalAmount,
+                receiptNo: payment.receiptNo || "-",
+            }));
+
+            if (!isMounted.current) return;
+            setCustomer({
+                id: record.id,
+                name: record.name,
+                phone: record.phone || "",
+            });
+            setUnpaidItems(enriched);
+            setPayments(mappedPayments);
+        } catch (error) {
+            console.error("Failed to load credit details", error);
+        } finally {
+            if (isMounted.current) setLoading(false);
+        }
+    }, [id, language]);
 
     useEffect(() => {
-        let active = true;
-
-        const loadCustomer = async () => {
-            if (typeof id !== "string") return;
-            setLoading(true);
-            try {
-                const record = await getCustomerById(id);
-                const unpaid = await getCustomerUnpaidItems(record);
-                const enriched = await Promise.all(
-                    unpaid.map(async (entry) => {
-                        const product = await entry.saleItem.product.fetch();
-                        return {
-                            id: entry.saleItem.id,
-                            title: product?.name || "Item",
-                            qty: entry.saleItem.quantity,
-                            date: entry.sale?.soldAt
-                                ? new Date(
-                                      entry.sale.soldAt,
-                                  ).toLocaleDateString()
-                                : "",
-                            amount: entry.remainingBalance,
-                            saleItem: entry.saleItem,
-                        };
-                    }),
-                );
-                const paymentRows = await getCustomerPayments(id, 30);
-                const mappedPayments = paymentRows.map((payment) => ({
-                    id: payment.id,
-                    date: payment.paidAt
-                        ? new Date(payment.paidAt).toLocaleDateString()
-                        : "",
-                    amount: payment.totalAmount,
-                    receiptNo: payment.receiptNo || "-",
-                }));
-
-                if (!active) return;
-                setCustomer({
-                    id: record.id,
-                    name: record.name,
-                    phone: record.phone || "",
-                });
-                setUnpaidItems(enriched);
-                setPayments(mappedPayments);
-            } catch (error) {
-                console.error("Failed to load credit details", error);
-            } finally {
-                if (active) setLoading(false);
-            }
-        };
-
+        isMounted.current = true;
         loadCustomer();
+        return () => {
+            isMounted.current = false;
+        };
+    }, [loadCustomer]);
+
+    useEffect(() => {
+        if (typeof id !== "string") return;
+        const salesCollection = database.collections.get("sales");
+        const saleItemsCollection = database.collections.get("sale_items");
+        const creditPaymentsCollection =
+            database.collections.get("credit_payments");
+        const creditPaymentItemsCollection = database.collections.get(
+            "credit_payment_items",
+        );
+
+        const subscriptions = [
+            salesCollection.query(Q.where("customer_id", id)).observe(),
+            saleItemsCollection
+                .query(Q.on("sales", "customer_id", id))
+                .observe(),
+            creditPaymentsCollection
+                .query(Q.where("customer_id", id))
+                .observe(),
+            creditPaymentItemsCollection
+                .query(Q.on("credit_payments", "customer_id", id))
+                .observe(),
+        ].map((observable) => observable.subscribe(() => loadCustomer()));
 
         return () => {
-            active = false;
+            subscriptions.forEach((sub) => sub.unsubscribe());
         };
-    }, [id]);
+    }, [id, loadCustomer]);
 
     const balance = useMemo(
         () => unpaidItems.reduce((sum, item) => sum + item.amount, 0),
@@ -94,7 +128,7 @@ const CreditDetailsScreen = () => {
             <>
                 <Stack.Screen
                     options={{
-                        headerTitle: "Credit Details",
+                        headerTitle: i18n.t("credits.details.title"),
                         headerTitleStyle: {
                             fontWeight: "700",
                             fontSize: 20,
@@ -107,13 +141,17 @@ const CreditDetailsScreen = () => {
                         <Card.Content style={{ gap: 8 }}>
                             <Text style={styles.title}>
                                 {loading
-                                    ? "Loading customer…"
-                                    : "Customer not found"}
+                                    ? i18n.t("credits.details.loadingCustomer")
+                                    : i18n.t(
+                                          "credits.details.customerNotFound",
+                                      )}
                             </Text>
                             <Text style={styles.meta}>
                                 {loading
-                                    ? "Fetching credit details."
-                                    : "Select a customer from credits to view details."}
+                                    ? i18n.t("credits.details.fetchingDetails")
+                                    : i18n.t(
+                                          "credits.details.selectCustomerPrompt",
+                                      )}
                             </Text>
                             {loading && <ActivityIndicator />}
                             {!loading && (
@@ -121,7 +159,7 @@ const CreditDetailsScreen = () => {
                                     mode="contained"
                                     onPress={() => router.back()}
                                 >
-                                    Back to credits
+                                    {i18n.t("credits.details.backToCredits")}
                                 </Button>
                             )}
                         </Card.Content>
@@ -147,9 +185,11 @@ const CreditDetailsScreen = () => {
                 <View style={styles.profileCard}>
                     <InitialAvatar size={72} />
                     <Text style={styles.profileName}>{customer.name}</Text>
-                    <Text style={styles.meta}>Total Outstanding Balance</Text>
+                    <Text style={styles.meta}>
+                        {i18n.t("credits.details.totalOutstanding")}
+                    </Text>
                     <Text style={styles.balanceValue}>
-                        ETB {balance.toLocaleString()}
+                        {currencyPrefix} {balance.toLocaleString()}
                     </Text>
                     <View style={styles.profileMetaRow}>
                         <Icon
@@ -178,7 +218,7 @@ const CreditDetailsScreen = () => {
                                     : theme.colors.text,
                         }}
                     >
-                        Unpaid Items
+                        {i18n.t("credits.details.unpaidItems")}
                     </Chip>
                     <Chip
                         selected={tab === "payments"}
@@ -196,7 +236,7 @@ const CreditDetailsScreen = () => {
                                     : theme.colors.text,
                         }}
                     >
-                        Payment History
+                        {i18n.t("credits.details.paymentHistory")}
                     </Chip>
                 </View>
 
@@ -206,7 +246,7 @@ const CreditDetailsScreen = () => {
                             <Card style={styles.card}>
                                 <Card.Content>
                                     <Text style={styles.meta}>
-                                        No unpaid items.
+                                        {i18n.t("credits.details.noUnpaid")}
                                     </Text>
                                 </Card.Content>
                             </Card>
@@ -226,11 +266,13 @@ const CreditDetailsScreen = () => {
                                             {item.title}
                                         </Text>
                                         <Text style={styles.meta}>
-                                            Qty {item.qty} • {item.date}
+                                            {i18n.t("credits.details.qty")}{" "}
+                                            {item.qty} • {item.date}
                                         </Text>
                                     </View>
                                     <Text style={styles.itemAmount}>
-                                        ETB {item.amount.toLocaleString()}
+                                        {currencyPrefix}{" "}
+                                        {item.amount.toLocaleString()}
                                     </Text>
                                 </Card.Content>
                             </Card>
@@ -244,7 +286,7 @@ const CreditDetailsScreen = () => {
                             <Card style={styles.card}>
                                 <Card.Content>
                                     <Text style={styles.meta}>
-                                        No payments recorded.
+                                        {i18n.t("credits.details.noPayments")}
                                     </Text>
                                 </Card.Content>
                             </Card>
@@ -261,17 +303,23 @@ const CreditDetailsScreen = () => {
                                     </View>
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.itemTitle}>
-                                            Payment received
+                                            {i18n.t(
+                                                "credits.details.paymentReceived",
+                                            )}
                                         </Text>
                                         <Text style={styles.meta}>
                                             {payment.date}
                                         </Text>
                                         <Text style={styles.meta}>
-                                            Receipt: {payment.receiptNo}
+                                            {i18n.t(
+                                                "credits.details.receiptLabel",
+                                            )}{" "}
+                                            {payment.receiptNo}
                                         </Text>
                                     </View>
                                     <Text style={styles.itemAmount}>
-                                        ETB {payment.amount.toLocaleString()}
+                                        {currencyPrefix}{" "}
+                                        {payment.amount.toLocaleString()}
                                     </Text>
                                 </Card.Content>
                             </Card>
@@ -291,7 +339,7 @@ const CreditDetailsScreen = () => {
                             })
                         }
                     >
-                        Receive Payment
+                        {i18n.t("credits.actions.receivePayment")}
                     </Button>
                 </View>
             </Screen>

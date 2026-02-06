@@ -1,5 +1,5 @@
 import { router, Stack, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import {
     ActivityIndicator,
@@ -11,10 +11,20 @@ import {
     Text,
 } from "react-native-paper";
 import Screen from "../../../src/components/Screen";
+import database from "../../../src/database";
+import i18n from "../../../src/i18n";
+import { useLanguage } from "../../../src/i18n/LanguageContext";
+import { getSalePaymentSummary } from "../../../src/services/creditService";
 import { getSales } from "../../../src/services/saleService";
 import theme from "../../../src/theme";
 
 const SalesScreen = () => {
+    const { language } = useLanguage();
+    const locale = language === "ti" ? "ti-ET" : "en";
+    const currencyPrefix = useMemo(
+        () => i18n.t("common.currency.prefix"),
+        [language],
+    );
     const [filter, setFilter] = useState("all");
     const [query, setQuery] = useState("");
 
@@ -50,22 +60,36 @@ const SalesScreen = () => {
                     const soldAt = sale.soldAt
                         ? new Date(sale.soldAt)
                         : new Date();
-                    const dateLabel = soldAt.toLocaleDateString();
-                    const timeLabel = soldAt.toLocaleTimeString([], {
+                    const dateLabel = soldAt.toLocaleDateString(locale);
+                    const timeLabel = soldAt.toLocaleTimeString(locale, {
                         hour: "2-digit",
                         minute: "2-digit",
                     });
-                    const status =
-                        sale.type === "credit" && amount > 0
-                            ? "credit"
-                            : "paid";
+                    let status = "paid";
+                    let tag = i18n.t("sales.tags.paid");
+
+                    if (sale.type === "credit") {
+                        const summary = await getSalePaymentSummary(sale);
+                        if (summary.remainingBalance > 0) {
+                            status =
+                                summary.initialPaid > 0 ? "partial" : "credit";
+                            tag =
+                                status === "partial"
+                                    ? i18n.t("sales.tags.partial")
+                                    : i18n.t("sales.tags.credit");
+                        } else {
+                            status = "paid";
+                            tag = i18n.t("sales.tags.paid");
+                        }
+                    }
 
                     return {
                         id: sale.id,
-                        customer: customer?.name || "Walk-in",
+                        customer:
+                            customer?.name || i18n.t("home.customer.walkIn"),
                         amount,
                         profit,
-                        tag: sale.type === "credit" ? "Credit" : "Paid",
+                        tag,
                         status,
                         time: timeLabel,
                         receipt: sale.id.slice(0, 8).toUpperCase(),
@@ -74,7 +98,14 @@ const SalesScreen = () => {
                 }),
             );
 
-            const grouped = items.reduce((acc, item) => {
+            const filteredItems =
+                filter === "partial"
+                    ? items.filter((item) => item.status === "partial")
+                    : filter === "credit"
+                      ? items.filter((item) => item.status === "credit")
+                      : items;
+
+            const grouped = filteredItems.reduce((acc, item) => {
                 if (!acc[item.dateLabel]) acc[item.dateLabel] = [];
                 acc[item.dateLabel].push(item);
                 return acc;
@@ -91,7 +122,7 @@ const SalesScreen = () => {
         } catch (error) {
             console.error("Failed to load sales", error);
             setSections([]);
-            setError("Unable to load sales.");
+            setError(i18n.t("sales.errors.load"));
         } finally {
             setLoading(false);
         }
@@ -99,6 +130,27 @@ const SalesScreen = () => {
 
     useEffect(() => {
         loadSales();
+    }, [loadSales]);
+
+    useEffect(() => {
+        const salesCollection = database.collections.get("sales");
+        const saleItemsCollection = database.collections.get("sale_items");
+        const creditPaymentsCollection =
+            database.collections.get("credit_payments");
+        const creditPaymentItemsCollection = database.collections.get(
+            "credit_payment_items",
+        );
+
+        const subscriptions = [
+            salesCollection.query().observe(),
+            saleItemsCollection.query().observe(),
+            creditPaymentsCollection.query().observe(),
+            creditPaymentItemsCollection.query().observe(),
+        ].map((observable) => observable.subscribe(() => loadSales()));
+
+        return () => {
+            subscriptions.forEach((sub) => sub.unsubscribe());
+        };
     }, [loadSales]);
 
     useFocusEffect(
@@ -111,7 +163,7 @@ const SalesScreen = () => {
         <>
             <Stack.Screen
                 options={{
-                    headerTitle: "Sales History",
+                    headerTitle: i18n.t("sales.title"),
                     headerTitleStyle: {
                         fontSize: 22,
                         fontWeight: "700",
@@ -132,7 +184,7 @@ const SalesScreen = () => {
                 <Searchbar
                     value={query}
                     onChangeText={setQuery}
-                    placeholder="Search by customer..."
+                    placeholder={i18n.t("sales.searchPlaceholder")}
                     style={styles.search}
                     inputStyle={{ fontSize: 16 }}
                     iconColor={theme.colors.primary}
@@ -155,7 +207,7 @@ const SalesScreen = () => {
                             filter === "all" && styles.filterChipActive,
                         ]}
                     >
-                        All
+                        {i18n.t("sales.filters.all")}
                     </Chip>
                     <Chip
                         selected={filter === "cash"}
@@ -173,7 +225,7 @@ const SalesScreen = () => {
                             filter === "cash" && styles.filterChipActive,
                         ]}
                     >
-                        Cash
+                        {i18n.t("sales.filters.cash")}
                     </Chip>
                     <Chip
                         selected={filter === "credit"}
@@ -191,7 +243,7 @@ const SalesScreen = () => {
                             filter === "credit" && styles.filterChipActive,
                         ]}
                     >
-                        Credit
+                        {i18n.t("sales.filters.credit")}
                     </Chip>
                     <Chip
                         selected={filter === "partial"}
@@ -209,7 +261,7 @@ const SalesScreen = () => {
                             filter === "partial" && styles.filterChipActive,
                         ]}
                     >
-                        Partial
+                        {i18n.t("sales.filters.partial")}
                     </Chip>
                 </View>
 
@@ -222,14 +274,18 @@ const SalesScreen = () => {
                     {loading && (
                         <View style={styles.emptyState}>
                             <ActivityIndicator animating />
-                            <Text style={styles.meta}>Loading sales…</Text>
+                            <Text style={styles.meta}>
+                                {i18n.t("sales.loading")}
+                            </Text>
                         </View>
                     )}
                     {!loading && sections.length === 0 && (
                         <View style={styles.emptyState}>
-                            <Text style={styles.emptyTitle}>No sales yet</Text>
+                            <Text style={styles.emptyTitle}>
+                                {i18n.t("sales.emptyTitle")}
+                            </Text>
                             <Text style={styles.meta}>
-                                Sales will appear here once recorded.
+                                {i18n.t("sales.emptySubtitle")}
                             </Text>
                         </View>
                     )}
@@ -284,7 +340,7 @@ const SalesScreen = () => {
                                             >
                                                 <Text style={styles.amount}>
                                                     {item.amount.toLocaleString()}{" "}
-                                                    ETB
+                                                    {currencyPrefix}
                                                 </Text>
                                                 <Text
                                                     style={
@@ -294,8 +350,8 @@ const SalesScreen = () => {
                                                     }
                                                 >
                                                     {item.profit >= 0
-                                                        ? `Profit ETB ${item.profit.toLocaleString()}`
-                                                        : `Loss ETB ${Math.abs(item.profit).toLocaleString()}`}
+                                                        ? `${i18n.t("sales.profitLabel")} ${currencyPrefix} ${item.profit.toLocaleString()}`
+                                                        : `${i18n.t("sales.lossLabel")} ${currencyPrefix} ${Math.abs(item.profit).toLocaleString()}`}
                                                 </Text>
                                                 <View
                                                     style={[

@@ -1,6 +1,6 @@
 import { configureFonts, MD3LightTheme } from "react-native-paper";
 
-const fontConfig = {
+const interFontConfig = {
     default: {
         regular: {
             fontFamily: "Inter_400Regular",
@@ -21,9 +21,29 @@ const fontConfig = {
     },
 };
 
-const theme = {
+const ethiopicFontConfig = {
+    default: {
+        regular: {
+            fontFamily: "NotoSansEthiopic_400Regular",
+            fontWeight: "400",
+        },
+        medium: {
+            fontFamily: "NotoSansEthiopic_500Medium",
+            fontWeight: "500",
+        },
+        semibold: {
+            fontFamily: "NotoSansEthiopic_600SemiBold",
+            fontWeight: "600",
+        },
+        bold: {
+            fontFamily: "NotoSansEthiopic_700Bold",
+            fontWeight: "700",
+        },
+    },
+};
+
+const baseTheme = {
     ...MD3LightTheme,
-    fonts: configureFonts({ config: fontConfig }),
     colors: {
         ...MD3LightTheme.colors,
         primary: "#2563EB",
@@ -39,4 +59,15 @@ const theme = {
     roundness: 12,
 };
 
+const buildTheme = (language = "en") => {
+    const fontConfig = language === "ti" ? ethiopicFontConfig : interFontConfig;
+    return {
+        ...baseTheme,
+        fonts: configureFonts({ config: fontConfig }),
+    };
+};
+
+const theme = buildTheme("en");
+
+export { buildTheme };
 export default theme;

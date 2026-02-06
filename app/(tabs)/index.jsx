@@ -6,10 +6,13 @@ import LowStockAlert from "../../src/components/LowStockAlert";
 import RecentSaleItem from "../../src/components/RecentSaleItem";
 import ScrollScreen from "../../src/components/ScrollScreen";
 import StatCard from "../../src/components/StatCard";
+import i18n from "../../src/i18n";
+import { useLanguage } from "../../src/i18n/LanguageContext";
 import { getDashboardSummary } from "../../src/services/reportingService";
 import theme from "../../src/theme";
 
 const HomeScreen = () => {
+    const { language } = useLanguage();
     const [stats, setStats] = useState([]);
     const [lowStockItems, setLowStockItems] = useState([]);
     const [recentSales, setRecentSales] = useState([]);
@@ -17,21 +20,21 @@ const HomeScreen = () => {
     const quickActions = useMemo(
         () => [
             {
-                label: "New Sale",
+                label: "home.actions.newSale",
                 icon: "cart-check",
                 mode: "contained",
                 color: theme.colors.primary,
                 routeTo: "(tabs)/sales/new",
             },
             {
-                label: "Add Product",
+                label: "home.actions.addProduct",
                 icon: "plus-circle",
                 mode: "outlined",
                 color: theme.colors.primary,
                 routeTo: "(tabs)/inventory/new",
             },
         ],
-        [],
+        [language],
     );
 
     useEffect(() => {
@@ -49,20 +52,20 @@ const HomeScreen = () => {
 
                 setStats([
                     {
-                        label: "Total Products",
+                        label: i18n.t("home.stats.totalProducts"),
                         value: summary.totalProducts.toLocaleString(),
                         icon: "cube-outline",
                         color: theme.colors.primary,
                     },
                     {
-                        label: "Today’s Sales",
-                        value: `ETB ${summary.todaySalesTotal.toLocaleString()}`,
+                        label: i18n.t("home.stats.todaysSales"),
+                        value: `${i18n.t("home.stats.currencyPrefix")} ${summary.todaySalesTotal.toLocaleString()}`,
                         icon: "cash-multiple",
                         color: theme.colors.secondary,
                     },
                     {
-                        label: "Outstanding Credit",
-                        value: `ETB ${summary.outstandingCredit.toLocaleString()}`,
+                        label: i18n.t("home.stats.outstandingCredit"),
+                        value: `${i18n.t("home.stats.currencyPrefix")} ${summary.outstandingCredit.toLocaleString()}`,
                         icon: "wallet-outline",
                         color: theme.colors.warning,
                     },
@@ -71,7 +74,7 @@ const HomeScreen = () => {
                 const lowStock = summary.lowStockProducts.map((product) => ({
                     id: product.id,
                     name: product.name,
-                    stock: `${product.stock} left`,
+                    stock: `${product.stock} ${i18n.t("home.stock.leftSuffix")}`,
                     icon: "cube-outline",
                     iconColor: theme.colors.warning,
                     iconBg: "#FEF3C7",
@@ -98,7 +101,9 @@ const HomeScreen = () => {
 
                         return {
                             id: sale.id,
-                            customerName: customer?.name || "Walk-in",
+                            customerName:
+                                customer?.name ||
+                                i18n.t("home.customer.walkIn"),
                             amount,
                             time: timeLabel,
                             type: sale.type,
@@ -112,7 +117,7 @@ const HomeScreen = () => {
             } catch (error) {
                 console.error("Failed to load dashboard", error);
                 if (active) {
-                    setError("Unable to load dashboard data.");
+                    setError(i18n.t("home.errors.loadDashboard"));
                 }
             }
         };
@@ -122,7 +127,7 @@ const HomeScreen = () => {
         return () => {
             active = false;
         };
-    }, []);
+    }, [language]);
 
     return (
         <ScrollScreen style={styles.container}>
@@ -163,7 +168,7 @@ const HomeScreen = () => {
                         labelStyle={styles.actionLabel}
                         onPress={() => router.push(action.routeTo)}
                     >
-                        {action.label}
+                        {i18n.t(action.label)}
                     </Button>
                 ))}
             </View>
@@ -172,9 +177,11 @@ const HomeScreen = () => {
                 <LowStockAlert items={lowStockItems} />
             ) : (
                 <View style={styles.emptyCard}>
-                    <Text style={styles.emptyTitle}>No low stock items</Text>
+                    <Text style={styles.emptyTitle}>
+                        {i18n.t("home.stock.noLowStockTitle")}
+                    </Text>
                     <Text style={styles.emptySubtitle}>
-                        All products are above the low stock threshold.
+                        {i18n.t("home.stock.noLowStockSubtitle")}
                     </Text>
                 </View>
             )}
@@ -182,7 +189,9 @@ const HomeScreen = () => {
             <View>
                 <View style={styles.header}>
                     <View style={styles.titleContainer}>
-                        <Text style={styles.recentListTitle}>Recent Sales</Text>
+                        <Text style={styles.recentListTitle}>
+                            {i18n.t("home.sales.recentTitle")}
+                        </Text>
                     </View>
                     <Button
                         mode="text"
@@ -190,14 +199,16 @@ const HomeScreen = () => {
                         labelStyle={styles.seeAllLabel}
                         compact
                     >
-                        See All
+                        {i18n.t("home.sales.seeAll")}
                     </Button>
                 </View>
                 {recentSales.length === 0 ? (
                     <View style={styles.emptyCard}>
-                        <Text style={styles.emptyTitle}>No recent sales</Text>
+                        <Text style={styles.emptyTitle}>
+                            {i18n.t("home.sales.noRecentTitle")}
+                        </Text>
                         <Text style={styles.emptySubtitle}>
-                            Sales will appear here once recorded.
+                            {i18n.t("home.sales.noRecentSubtitle")}
                         </Text>
                     </View>
                 ) : (

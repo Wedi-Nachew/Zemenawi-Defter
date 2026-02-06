@@ -1,5 +1,6 @@
+import { Q } from "@nozbe/watermelondb";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import {
     ActivityIndicator,
@@ -17,7 +18,12 @@ import {
 } from "react-native-paper";
 import Screen from "../../../src/components/Screen";
 import database from "../../../src/database";
-import { getCustomersWithBalances } from "../../../src/services/creditService";
+import i18n from "../../../src/i18n";
+import { useLanguage } from "../../../src/i18n/LanguageContext";
+import {
+    getCustomersWithBalances,
+    getSalePaymentSummary,
+} from "../../../src/services/creditService";
 import { createCustomer } from "../../../src/services/customerService";
 import {
     deleteSale,
@@ -27,10 +33,15 @@ import {
 import theme from "../../../src/theme";
 
 const SaleDetailsScreen = () => {
+    const { language } = useLanguage();
+    const locale = language === "ti" ? "ti-ET" : "en";
+    const currencyPrefix = i18n.t("common.currency.prefix");
     const { id } = useLocalSearchParams();
     const [sale, setSale] = useState(null);
     const [items, setItems] = useState([]);
-    const [customerName, setCustomerName] = useState("Walk-in");
+    const [customerName, setCustomerName] = useState(
+        i18n.t("home.customer.walkIn"),
+    );
     const [loading, setLoading] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
@@ -49,43 +60,76 @@ const SaleDetailsScreen = () => {
     const [editItem, setEditItem] = useState(null);
     const [editQty, setEditQty] = useState("");
     const [editPrice, setEditPrice] = useState("");
+    const [paymentSummary, setPaymentSummary] = useState({
+        totalPaid: 0,
+        initialPaid: 0,
+        remainingBalance: 0,
+    });
+    const isMounted = useRef(true);
+
+    const loadSale = useCallback(async () => {
+        if (typeof id !== "string") return;
+        setLoading(true);
+        try {
+            const saleRecord = await getSaleById(id);
+            const saleItems = await getSaleItems(id);
+            const resolvedItems = await Promise.all(
+                saleItems.map(async (record) => {
+                    const product = await record.product.fetch();
+                    return { record, product };
+                }),
+            );
+            const customer = saleRecord.customerId
+                ? await saleRecord.customer.fetch()
+                : null;
+            const summary = await getSalePaymentSummary(saleRecord);
+
+            if (!isMounted.current) return;
+            setSale(saleRecord);
+            setItems(resolvedItems);
+            setCustomerName(customer?.name || i18n.t("home.customer.walkIn"));
+            setPaymentSummary(summary);
+        } catch (error) {
+            console.error("Failed to load sale details", error);
+        } finally {
+            if (isMounted.current) setLoading(false);
+        }
+    }, [id]);
 
     useEffect(() => {
-        let active = true;
-
-        const loadSale = async () => {
-            if (typeof id !== "string") return;
-            setLoading(true);
-            try {
-                const saleRecord = await getSaleById(id);
-                const saleItems = await getSaleItems(id);
-                const resolvedItems = await Promise.all(
-                    saleItems.map(async (record) => {
-                        const product = await record.product.fetch();
-                        return { record, product };
-                    }),
-                );
-                const customer = saleRecord.customerId
-                    ? await saleRecord.customer.fetch()
-                    : null;
-
-                if (!active) return;
-                setSale(saleRecord);
-                setItems(resolvedItems);
-                setCustomerName(customer?.name || "Walk-in");
-            } catch (error) {
-                console.error("Failed to load sale details", error);
-            } finally {
-                if (active) setLoading(false);
-            }
-        };
-
+        isMounted.current = true;
         loadSale();
+        return () => {
+            isMounted.current = false;
+        };
+    }, [loadSale]);
+
+    useEffect(() => {
+        if (!sale?.customerId) {
+            setCustomerName(i18n.t("home.customer.walkIn"));
+        }
+    }, [language, sale?.customerId]);
+
+    useEffect(() => {
+        if (typeof id !== "string") return;
+        const salesCollection = database.collections.get("sales");
+        const saleItemsCollection = database.collections.get("sale_items");
+        const creditPaymentItemsCollection = database.collections.get(
+            "credit_payment_items",
+        );
+
+        const subscriptions = [
+            salesCollection.query(Q.where("id", id)).observe(),
+            saleItemsCollection.query(Q.where("sale_id", id)).observe(),
+            creditPaymentItemsCollection
+                .query(Q.on("sale_items", "sale_id", id))
+                .observe(),
+        ].map((observable) => observable.subscribe(() => loadSale()));
 
         return () => {
-            active = false;
+            subscriptions.forEach((sub) => sub.unsubscribe());
         };
-    }, [id]);
+    }, [id, loadSale]);
 
     useEffect(() => {
         let active = true;
@@ -151,7 +195,7 @@ const SaleDetailsScreen = () => {
             <>
                 <Stack.Screen
                     options={{
-                        headerTitle: "Sale Details",
+                        headerTitle: i18n.t("sales.details.title"),
                         headerTitleStyle: {
                             fontWeight: "700",
                             fontSize: 20,
@@ -163,12 +207,14 @@ const SaleDetailsScreen = () => {
                     <Card style={styles.card}>
                         <Card.Content style={{ gap: 8, alignItems: "center" }}>
                             <Text style={styles.title}>
-                                {loading ? "Loading sale…" : "Sale not found"}
+                                {loading
+                                    ? i18n.t("sales.details.loadingSale")
+                                    : i18n.t("sales.details.saleNotFound")}
                             </Text>
                             <Text style={styles.meta}>
                                 {loading
-                                    ? "Fetching sale details."
-                                    : "Select a sale from history to view details."}
+                                    ? i18n.t("sales.details.fetchingDetails")
+                                    : i18n.t("sales.details.selectSalePrompt")}
                             </Text>
                             {loading && (
                                 <ActivityIndicator
@@ -181,7 +227,7 @@ const SaleDetailsScreen = () => {
                                     mode="contained"
                                     onPress={() => router.back()}
                                 >
-                                    Back to history
+                                    {i18n.t("sales.details.backToHistory")}
                                 </Button>
                             )}
                         </Card.Content>
@@ -191,13 +237,25 @@ const SaleDetailsScreen = () => {
         );
     }
 
-    const balance = sale.type === "credit" ? totals.total : 0;
+    const computedStatus =
+        sale.type === "credit"
+            ? paymentSummary.remainingBalance > 0
+                ? paymentSummary.initialPaid > 0
+                    ? "partial"
+                    : "credit"
+                : "paid"
+            : "paid";
+    const balance =
+        sale.type === "credit" ? paymentSummary.remainingBalance : 0;
+    const paidAmount =
+        sale.type === "credit" ? paymentSummary.totalPaid : totals.total;
+    const downPayment = sale.type === "credit" ? paymentSummary.initialPaid : 0;
     const profit = totals.total - totals.cost;
-    const status = getStatusTone(sale.type);
+    const status = getStatusTone(computedStatus);
 
     const openEdit = () => {
         const soldAtValue = sale.soldAt
-            ? new Date(sale.soldAt).toLocaleString()
+            ? new Date(sale.soldAt).toISOString()
             : "";
         setEditSoldAt(soldAtValue);
         setEditError("");
@@ -211,12 +269,12 @@ const SaleDetailsScreen = () => {
     const handleEditSave = async () => {
         const parsedDate = Date.parse(editSoldAt);
         if (Number.isNaN(parsedDate)) {
-            setEditError("Enter a valid date/time.");
+            setEditError(i18n.t("sales.errors.invalidDate"));
             return;
         }
 
         if (editType === "credit" && !editCustomer) {
-            setEditError("Customer is required for credit sales.");
+            setEditError(i18n.t("sales.errors.customerRequired"));
             return;
         }
 
@@ -237,7 +295,7 @@ const SaleDetailsScreen = () => {
             setEditOpen(false);
         } catch (error) {
             console.error("Failed to edit sale", error);
-            setEditError("Unable to save changes.");
+            setEditError(i18n.t("sales.errors.saveChanges"));
         } finally {
             setSaving(false);
         }
@@ -353,7 +411,7 @@ const SaleDetailsScreen = () => {
                                         {sale.soldAt
                                             ? new Date(
                                                   sale.soldAt,
-                                              ).toLocaleString()
+                                              ).toLocaleString(locale)
                                             : ""}
                                     </Text>
                                 </View>
@@ -374,14 +432,18 @@ const SaleDetailsScreen = () => {
                                 </View>
                             </View>
                             <View style={styles.amountRow}>
-                                <Text style={styles.meta}>Total</Text>
+                                <Text style={styles.meta}>
+                                    {i18n.t("common.labels.total")}
+                                </Text>
                                 <Text style={styles.amountValue}>
-                                    ETB{" "}
+                                    {currencyPrefix}{" "}
                                     {toNumber(totals.total).toLocaleString()}
                                 </Text>
                             </View>
                             <View style={styles.amountRow}>
-                                <Text style={styles.meta}>Profit / Loss</Text>
+                                <Text style={styles.meta}>
+                                    {i18n.t("common.labels.profitLoss")}
+                                </Text>
                                 <Text
                                     style={
                                         profit >= 0
@@ -390,8 +452,8 @@ const SaleDetailsScreen = () => {
                                     }
                                 >
                                     {profit >= 0
-                                        ? `ETB ${toNumber(profit).toLocaleString()}`
-                                        : `- ETB ${Math.abs(toNumber(profit)).toLocaleString()}`}
+                                        ? `${currencyPrefix} ${toNumber(profit).toLocaleString()}`
+                                        : `- ${currencyPrefix} ${Math.abs(toNumber(profit)).toLocaleString()}`}
                                 </Text>
                             </View>
                         </Card.Content>
@@ -399,7 +461,9 @@ const SaleDetailsScreen = () => {
 
                     <Card style={styles.card}>
                         <Card.Content style={{ gap: 10 }}>
-                            <Text style={styles.sectionTitle}>Items</Text>
+                            <Text style={styles.sectionTitle}>
+                                {i18n.t("sales.details.items")}
+                            </Text>
                             {items.map((item, idx) => (
                                 <View
                                     key={`${item.record?.id || "item"}-${idx}`}
@@ -407,19 +471,20 @@ const SaleDetailsScreen = () => {
                                 >
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.cardTitle}>
-                                            {item.product?.name || "Item"}
+                                            {item.product?.name ||
+                                                i18n.t("common.labels.item")}
                                         </Text>
                                         <Text style={styles.meta}>
-                                            Qty{" "}
+                                            {i18n.t("common.labels.quantity")}{" "}
                                             {toNumber(item.record?.quantity)} •
-                                            ETB{" "}
+                                            {currencyPrefix}{" "}
                                             {toNumber(
                                                 item.record?.sellingPrice,
                                             ).toLocaleString()}
                                         </Text>
                                     </View>
                                     <Text style={styles.itemTotal}>
-                                        ETB{" "}
+                                        {currencyPrefix}{" "}
                                         {(
                                             toNumber(item.record?.quantity) *
                                             toNumber(item.record?.sellingPrice)
@@ -430,7 +495,7 @@ const SaleDetailsScreen = () => {
                                         onPress={() => openItemEdit(item)}
                                         labelStyle={styles.linkButton}
                                     >
-                                        Edit
+                                        {i18n.t("common.actions.edit")}
                                     </Button>
                                     {idx < items.length - 1 && (
                                         <Divider style={{ marginTop: 10 }} />
@@ -442,22 +507,43 @@ const SaleDetailsScreen = () => {
 
                     <Card style={styles.card}>
                         <Card.Content style={{ gap: 10 }}>
-                            <Text style={styles.sectionTitle}>Payment</Text>
+                            <Text style={styles.sectionTitle}>
+                                {i18n.t("common.labels.payment")}
+                            </Text>
                             <View style={styles.rowBetween}>
-                                <Text style={styles.meta}>Method</Text>
+                                <Text style={styles.meta}>
+                                    {i18n.t("common.labels.method")}
+                                </Text>
                                 <Text style={styles.cardTitle}>
-                                    {sale.type === "credit" ? "Credit" : "Cash"}
+                                    {sale.type === "credit"
+                                        ? i18n.t("common.status.credit")
+                                        : i18n.t("common.status.cash")}
                                 </Text>
                             </View>
                             <View style={styles.rowBetween}>
-                                <Text style={styles.meta}>Paid</Text>
+                                <Text style={styles.meta}>
+                                    {i18n.t("common.labels.paid")}
+                                </Text>
                                 <Text style={styles.cardTitle}>
-                                    ETB{" "}
-                                    {toNumber(totals.total).toLocaleString()}
+                                    {currencyPrefix}{" "}
+                                    {toNumber(paidAmount).toLocaleString()}
                                 </Text>
                             </View>
+                            {sale.type === "credit" && (
+                                <View style={styles.rowBetween}>
+                                    <Text style={styles.meta}>
+                                        {i18n.t("common.labels.downPayment")}
+                                    </Text>
+                                    <Text style={styles.cardTitle}>
+                                        {currencyPrefix}{" "}
+                                        {toNumber(downPayment).toLocaleString()}
+                                    </Text>
+                                </View>
+                            )}
                             <View style={styles.rowBetween}>
-                                <Text style={styles.meta}>Balance</Text>
+                                <Text style={styles.meta}>
+                                    {i18n.t("common.labels.balance")}
+                                </Text>
                                 <Text
                                     style={[
                                         styles.cardTitle,
@@ -469,11 +555,14 @@ const SaleDetailsScreen = () => {
                                         },
                                     ]}
                                 >
-                                    ETB {toNumber(balance).toLocaleString()}
+                                    {currencyPrefix}{" "}
+                                    {toNumber(balance).toLocaleString()}
                                 </Text>
                             </View>
                             <View style={styles.rowBetween}>
-                                <Text style={styles.meta}>Profit / Loss</Text>
+                                <Text style={styles.meta}>
+                                    {i18n.t("common.labels.profitLoss")}
+                                </Text>
                                 <Text
                                     style={
                                         profit >= 0
@@ -482,8 +571,8 @@ const SaleDetailsScreen = () => {
                                     }
                                 >
                                     {profit >= 0
-                                        ? `ETB ${toNumber(profit).toLocaleString()}`
-                                        : `- ETB ${Math.abs(toNumber(profit)).toLocaleString()}`}
+                                        ? `${currencyPrefix} ${toNumber(profit).toLocaleString()}`
+                                        : `- ${currencyPrefix} ${Math.abs(toNumber(profit)).toLocaleString()}`}
                                 </Text>
                             </View>
                         </Card.Content>
@@ -492,15 +581,20 @@ const SaleDetailsScreen = () => {
                     <Card style={styles.summaryCard}>
                         <Card.Content style={styles.summaryRow}>
                             <View>
-                                <Text style={styles.meta}>Items Count</Text>
+                                <Text style={styles.meta}>
+                                    {i18n.t("common.labels.itemsCount")}
+                                </Text>
                                 <Text style={styles.cardTitle}>
-                                    {toNumber(totals.items)} Units
+                                    {toNumber(totals.items)}{" "}
+                                    {i18n.t("common.labels.units")}
                                 </Text>
                             </View>
                             <View style={{ alignItems: "flex-end" }}>
-                                <Text style={styles.meta}>Total Payable</Text>
+                                <Text style={styles.meta}>
+                                    {i18n.t("common.labels.totalPayable")}
+                                </Text>
                                 <Text style={styles.amountValue}>
-                                    ETB{" "}
+                                    {currencyPrefix}{" "}
                                     {toNumber(totals.total).toLocaleString()}
                                 </Text>
                             </View>
@@ -515,7 +609,7 @@ const SaleDetailsScreen = () => {
                         style={{ flex: 1 }}
                         onPress={openEdit}
                     >
-                        Edit Sale
+                        {i18n.t("sales.details.editSale")}
                     </Button>
                     <Button
                         mode="outlined"
@@ -524,7 +618,7 @@ const SaleDetailsScreen = () => {
                         onPress={() => setDeleteOpen(true)}
                         labelStyle={{ color: theme.colors.error }}
                     >
-                        Delete Sale
+                        {i18n.t("sales.details.deleteSale")}
                     </Button>
                 </View>
                 <Portal>
@@ -534,11 +628,11 @@ const SaleDetailsScreen = () => {
                         style={styles.dialog}
                     >
                         <Dialog.Title style={styles.dialogTitle}>
-                            Delete sale?
+                            {i18n.t("sales.details.deleteConfirmTitle")}
                         </Dialog.Title>
                         <Dialog.Content>
                             <Text style={styles.meta}>
-                                This action can’t be undone.
+                                {i18n.t("sales.details.deleteConfirmBody")}
                             </Text>
                         </Dialog.Content>
                         <Dialog.Actions>
@@ -547,7 +641,7 @@ const SaleDetailsScreen = () => {
                                 onPress={() => setDeleteOpen(false)}
                                 disabled={deleting}
                             >
-                                Cancel
+                                {i18n.t("common.actions.cancel")}
                             </Button>
                             <Button
                                 mode="contained"
@@ -556,7 +650,7 @@ const SaleDetailsScreen = () => {
                                 loading={deleting}
                                 disabled={deleting}
                             >
-                                Delete
+                                {i18n.t("common.actions.delete")}
                             </Button>
                         </Dialog.Actions>
                     </Dialog>
@@ -571,7 +665,7 @@ const SaleDetailsScreen = () => {
                         >
                             <View style={styles.editHeader}>
                                 <Text style={styles.dialogTitle}>
-                                    Edit Sale
+                                    {i18n.t("sales.details.editSale")}
                                 </Text>
                                 <IconButton
                                     icon="close"
@@ -579,7 +673,9 @@ const SaleDetailsScreen = () => {
                                 />
                             </View>
 
-                            <Text style={styles.sectionTitle}>Date & Time</Text>
+                            <Text style={styles.sectionTitle}>
+                                {i18n.t("sales.details.dateTime")}
+                            </Text>
                             <TextInput
                                 mode="outlined"
                                 value={editSoldAt}
@@ -588,7 +684,7 @@ const SaleDetailsScreen = () => {
                             />
 
                             <Text style={styles.sectionTitle}>
-                                Payment Type
+                                {i18n.t("sales.details.paymentType")}
                             </Text>
                             <View style={styles.editRow}>
                                 <Button
@@ -599,7 +695,7 @@ const SaleDetailsScreen = () => {
                                     }
                                     onPress={() => setEditType("cash")}
                                 >
-                                    Cash
+                                    {i18n.t("common.status.cash")}
                                 </Button>
                                 <Button
                                     mode={
@@ -609,16 +705,19 @@ const SaleDetailsScreen = () => {
                                     }
                                     onPress={() => setEditType("credit")}
                                 >
-                                    Credit
+                                    {i18n.t("common.status.credit")}
                                 </Button>
                             </View>
 
-                            <Text style={styles.sectionTitle}>Customer</Text>
+                            <Text style={styles.sectionTitle}>
+                                {i18n.t("sales.details.customer")}
+                            </Text>
                             <Button
                                 mode="outlined"
                                 onPress={() => setCustomerModalOpen(true)}
                             >
-                                {editCustomer?.name || "Select customer"}
+                                {editCustomer?.name ||
+                                    i18n.t("sales.details.selectCustomer")}
                             </Button>
 
                             {!!editError && (
@@ -633,7 +732,7 @@ const SaleDetailsScreen = () => {
                                     onPress={() => setEditOpen(false)}
                                     disabled={saving}
                                 >
-                                    Cancel
+                                    {i18n.t("common.actions.cancel")}
                                 </Button>
                                 <Button
                                     mode="contained"
@@ -641,7 +740,7 @@ const SaleDetailsScreen = () => {
                                     loading={saving}
                                     disabled={saving}
                                 >
-                                    Save
+                                    {i18n.t("common.actions.save")}
                                 </Button>
                             </View>
                         </ScrollView>
@@ -657,7 +756,9 @@ const SaleDetailsScreen = () => {
                         >
                             <View style={styles.editHeader}>
                                 <Text style={styles.dialogTitle}>
-                                    Select Customer
+                                    {i18n.t(
+                                        "sales.details.selectCustomerTitle",
+                                    )}
                                 </Text>
                                 <IconButton
                                     icon="close"
@@ -668,13 +769,17 @@ const SaleDetailsScreen = () => {
                                 mode="outlined"
                                 value={customerQuery}
                                 onChangeText={setCustomerQuery}
-                                placeholder="Search customers..."
+                                placeholder={i18n.t(
+                                    "sales.details.searchCustomersPlaceholder",
+                                )}
                                 style={styles.dialogInput}
                             />
                             <View style={styles.modalList}>
                                 {filteredCustomers.length === 0 ? (
                                     <Text style={styles.meta}>
-                                        No customers found.
+                                        {i18n.t(
+                                            "sales.details.noCustomersFound",
+                                        )}
                                     </Text>
                                 ) : (
                                     filteredCustomers.map((customer) => (
@@ -698,7 +803,7 @@ const SaleDetailsScreen = () => {
                                                     </Text>
                                                 </View>
                                                 <Text style={styles.modalPrice}>
-                                                    ETB{" "}
+                                                    {currencyPrefix}{" "}
                                                     {customer.balance.toLocaleString()}
                                                 </Text>
                                             </View>
@@ -715,24 +820,24 @@ const SaleDetailsScreen = () => {
                                 style={styles.addCustomerButton}
                             >
                                 {addCustomerVisible
-                                    ? "Close"
-                                    : "Add New Customer"}
+                                    ? i18n.t("common.actions.close")
+                                    : i18n.t("sales.details.addNewCustomer")}
                             </Button>
                             {addCustomerVisible && (
                                 <View style={styles.modalEditor}>
                                     <Text style={styles.sectionTitle}>
-                                        New Customer
+                                        {i18n.t("sales.details.newCustomer")}
                                     </Text>
                                     <TextInput
                                         mode="outlined"
-                                        label="Full Name"
+                                        label={i18n.t("common.labels.name")}
                                         value={newCustomerName}
                                         onChangeText={setNewCustomerName}
                                         style={styles.dialogInput}
                                     />
                                     <TextInput
                                         mode="outlined"
-                                        label="Phone"
+                                        label={i18n.t("common.labels.phone")}
                                         value={newCustomerPhone}
                                         onChangeText={setNewCustomerPhone}
                                         keyboardType="phone-pad"
@@ -742,7 +847,7 @@ const SaleDetailsScreen = () => {
                                         mode="contained"
                                         onPress={handleAddCustomer}
                                     >
-                                        Save Customer
+                                        {i18n.t("sales.details.saveCustomer")}
                                     </Button>
                                 </View>
                             )}
@@ -759,7 +864,7 @@ const SaleDetailsScreen = () => {
                         >
                             <View style={styles.editHeader}>
                                 <Text style={styles.dialogTitle}>
-                                    Edit Item
+                                    {i18n.t("sales.details.editItem")}
                                 </Text>
                                 <IconButton
                                     icon="close"
@@ -767,12 +872,13 @@ const SaleDetailsScreen = () => {
                                 />
                             </View>
                             <Text style={styles.cardTitle}>
-                                {editItem?.product?.name || "Item"}
+                                {editItem?.product?.name ||
+                                    i18n.t("common.labels.item")}
                             </Text>
                             <View style={styles.editRow}>
                                 <TextInput
                                     mode="outlined"
-                                    label="Qty"
+                                    label={i18n.t("common.labels.quantity")}
                                     value={editQty}
                                     onChangeText={setEditQty}
                                     keyboardType="numeric"
@@ -780,12 +886,16 @@ const SaleDetailsScreen = () => {
                                 />
                                 <TextInput
                                     mode="outlined"
-                                    label="Price"
+                                    label={i18n.t("common.labels.price")}
                                     value={editPrice}
                                     onChangeText={setEditPrice}
                                     keyboardType="numeric"
                                     style={styles.editField}
-                                    right={<TextInput.Affix text="ETB" />}
+                                    right={
+                                        <TextInput.Affix
+                                            text={currencyPrefix}
+                                        />
+                                    }
                                 />
                             </View>
                             <View style={styles.editActions}>
@@ -793,7 +903,7 @@ const SaleDetailsScreen = () => {
                                     mode="outlined"
                                     onPress={() => setEditItem(null)}
                                 >
-                                    Cancel
+                                    {i18n.t("common.actions.cancel")}
                                 </Button>
                                 <Button
                                     mode="contained"
@@ -801,7 +911,7 @@ const SaleDetailsScreen = () => {
                                     loading={saving}
                                     disabled={saving}
                                 >
-                                    Save
+                                    {i18n.t("common.actions.save")}
                                 </Button>
                             </View>
                         </ScrollView>
@@ -815,7 +925,7 @@ const SaleDetailsScreen = () => {
 const getStatusTone = (status) => {
     if (status === "credit") {
         return {
-            label: "Credit",
+            label: i18n.t("sales.tags.credit"),
             icon: "file-document-outline",
             iconBg: "#DBEAFE",
             iconColor: theme.colors.primary,
@@ -825,7 +935,7 @@ const getStatusTone = (status) => {
     }
     if (status === "partial") {
         return {
-            label: "Partial",
+            label: i18n.t("sales.tags.partial"),
             icon: "account-alert-outline",
             iconBg: "#FEF3C7",
             iconColor: theme.colors.warning,
@@ -834,7 +944,7 @@ const getStatusTone = (status) => {
         };
     }
     return {
-        label: "Paid",
+        label: i18n.t("sales.tags.paid"),
         icon: "account-check-outline",
         iconBg: "#DCFCE7",
         iconColor: theme.colors.secondary,

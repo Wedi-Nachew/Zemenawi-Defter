@@ -17,6 +17,8 @@ import {
 } from "react-native-paper";
 import Screen from "../../../src/components/Screen";
 import database from "../../../src/database";
+import i18n from "../../../src/i18n";
+import { useLanguage } from "../../../src/i18n/LanguageContext";
 import {
     addStock,
     deleteBatch,
@@ -30,6 +32,10 @@ import {
 import theme from "../../../src/theme";
 
 const ProductDetails = () => {
+    const { language } = useLanguage();
+    const locale = language === "ti" ? "ti-ET" : "en";
+    const currencyPrefix = i18n.t("common.currency.prefix");
+    const formatDateInput = (date) => date.toISOString().slice(0, 10);
     const { id } = useLocalSearchParams();
     const [product, setProduct] = useState(null);
     const [batches, setBatches] = useState([]);
@@ -40,7 +46,9 @@ const ProductDetails = () => {
     const [selectedBatch, setSelectedBatch] = useState(null);
     const [qty, setQty] = useState("1");
     const [cost, setCost] = useState("");
-    const [dateReceived, setDateReceived] = useState("Jan 28, 2026");
+    const [dateReceived, setDateReceived] = useState(() =>
+        formatDateInput(new Date()),
+    );
     const [productName, setProductName] = useState("");
     const [productUnit, setProductUnit] = useState("");
     const [productPrice, setProductPrice] = useState("");
@@ -81,7 +89,7 @@ const ProductDetails = () => {
             <>
                 <Stack.Screen
                     options={{
-                        headerTitle: "Product Details",
+                        headerTitle: i18n.t("inventory.details.title"),
                         headerTitleStyle: {
                             fontWeight: "700",
                             fontSize: 20,
@@ -94,13 +102,19 @@ const ProductDetails = () => {
                         <Card.Content style={{ gap: 8, alignItems: "center" }}>
                             <Text style={styles.title}>
                                 {loading
-                                    ? "Loading product…"
-                                    : "Product not found"}
+                                    ? i18n.t("inventory.details.loadingProduct")
+                                    : i18n.t(
+                                          "inventory.details.productNotFound",
+                                      )}
                             </Text>
                             <Text style={styles.meta}>
                                 {loading
-                                    ? "Fetching product details."
-                                    : "Select a product from the list to view its details."}
+                                    ? i18n.t(
+                                          "inventory.details.fetchingDetails",
+                                      )
+                                    : i18n.t(
+                                          "inventory.details.selectProductPrompt",
+                                      )}
                             </Text>
                             {loading && (
                                 <ActivityIndicator
@@ -113,7 +127,7 @@ const ProductDetails = () => {
                                     mode="contained"
                                     onPress={() => router.back()}
                                 >
-                                    Back to list
+                                    {i18n.t("inventory.details.backToList")}
                                 </Button>
                             )}
                         </Card.Content>
@@ -129,7 +143,7 @@ const ProductDetails = () => {
         setSelectedBatch(null);
         setQty("1");
         setCost("");
-        setDateReceived("Jan 28, 2026");
+        setDateReceived(formatDateInput(new Date()));
         setSheet("add-stock");
     };
 
@@ -139,8 +153,8 @@ const ProductDetails = () => {
         setCost(String(batch.purchasePrice ?? 0));
         setDateReceived(
             batch.purchasedAt
-                ? new Date(batch.purchasedAt).toLocaleDateString()
-                : "",
+                ? formatDateInput(new Date(batch.purchasedAt))
+                : formatDateInput(new Date()),
         );
         setSheet("edit-stock");
     };
@@ -282,7 +296,8 @@ const ProductDetails = () => {
                                         {product.name}
                                     </Text>
                                     <Text style={styles.meta}>
-                                        Unit: {product.unit}
+                                        {i18n.t("inventory.details.unitLabel")}{" "}
+                                        {product.unit}
                                     </Text>
                                 </View>
                                 <Chip
@@ -301,10 +316,10 @@ const ProductDetails = () => {
                             </View>
                             <View style={styles.priceRow}>
                                 <Text style={styles.priceLabel}>
-                                    Selling Price
+                                    {i18n.t("inventory.details.sellingPrice")}
                                 </Text>
                                 <Text style={styles.priceValue}>
-                                    ETB{" "}
+                                    {currencyPrefix}{" "}
                                     {product.defaultSellingPrice.toLocaleString()}
                                 </Text>
                             </View>
@@ -318,7 +333,7 @@ const ProductDetails = () => {
                             style={{ flex: 1 }}
                             onPress={openAddStock}
                         >
-                            Add Stock
+                            {i18n.t("inventory.details.addStock")}
                         </Button>
                         <Button
                             mode="outlined"
@@ -326,23 +341,23 @@ const ProductDetails = () => {
                             style={{ flex: 1 }}
                             onPress={openEditProduct}
                         >
-                            Edit Product
+                            {i18n.t("inventory.details.editProduct")}
                         </Button>
                     </View>
 
                     <Card style={styles.infoCard}>
                         <Card.Content style={styles.infoGrid}>
                             <InfoCell
-                                label="Current Stock"
+                                label={i18n.t("inventory.details.currentStock")}
                                 value={`${product.stock} ${product.unit}`}
                                 tone={status.badgeBg}
                             />
                             <InfoCell
-                                label="Unit Price"
-                                value={`ETB ${product.defaultSellingPrice.toLocaleString()}`}
+                                label={i18n.t("inventory.details.unitPrice")}
+                                value={`${currencyPrefix} ${product.defaultSellingPrice.toLocaleString()}`}
                             />
                             <InfoCell
-                                label="SKU"
+                                label={i18n.t("inventory.details.sku")}
                                 value={product.id.toUpperCase()}
                             />
                         </Card.Content>
@@ -359,20 +374,22 @@ const ProductDetails = () => {
                                     />
                                 </View>
                                 <Text style={styles.batchTitle}>
-                                    Batch History
+                                    {i18n.t("inventory.details.batchHistory")}
                                 </Text>
                             </View>
                             {loading ? (
                                 <View style={styles.emptyBatch}>
                                     <ActivityIndicator animating />
                                     <Text style={styles.meta}>
-                                        Loading batch history…
+                                        {i18n.t(
+                                            "inventory.details.loadingBatchHistory",
+                                        )}
                                     </Text>
                                 </View>
                             ) : displayBatches.length === 0 ? (
                                 <View style={styles.emptyBatch}>
                                     <Text style={styles.meta}>
-                                        No batches recorded.
+                                        {i18n.t("inventory.details.noBatches")}
                                     </Text>
                                 </View>
                             ) : (
@@ -387,13 +404,17 @@ const ProductDetails = () => {
                                                     {batch.purchasedAt
                                                         ? new Date(
                                                               batch.purchasedAt,
-                                                          ).toLocaleDateString()
+                                                          ).toLocaleDateString(
+                                                              locale,
+                                                          )
                                                         : ""}
                                                 </Text>
                                                 <Text style={styles.meta}>
                                                     {batch.remainingQuantity ??
                                                         0}{" "}
-                                                    left
+                                                    {i18n.t(
+                                                        "inventory.details.leftSuffix",
+                                                    )}
                                                 </Text>
                                             </View>
                                             <View style={styles.batchActions}>
@@ -417,7 +438,10 @@ const ProductDetails = () => {
                                             </View>
                                         </View>
                                         <Text style={styles.meta}>
-                                            Purchase ETB{" "}
+                                            {i18n.t(
+                                                "inventory.details.purchasePrefix",
+                                            )}{" "}
+                                            {currencyPrefix}{" "}
                                             {(
                                                 batch.purchasePrice ?? 0
                                             ).toLocaleString()}
@@ -445,7 +469,7 @@ const ProductDetails = () => {
                         }}
                         onPress={openDeleteProductConfirmation}
                     >
-                        Delete Product
+                        {i18n.t("inventory.details.deleteProduct")}
                     </Button>
                 </View>
                 <Portal>
@@ -455,12 +479,11 @@ const ProductDetails = () => {
                         style={styles.dialog}
                     >
                         <Dialog.Title style={styles.dialogTitle}>
-                            Delete product?
+                            {i18n.t("inventory.details.deleteConfirmTitle")}
                         </Dialog.Title>
                         <Dialog.Content>
                             <Text style={styles.meta}>
-                                This action can’t be undone. The product will be
-                                removed if there is no remaining stock.
+                                {i18n.t("inventory.details.deleteConfirmBody")}
                             </Text>
                         </Dialog.Content>
                         <Dialog.Actions>
@@ -469,7 +492,7 @@ const ProductDetails = () => {
                                 onPress={() => setDeleteDialogOpen(false)}
                                 disabled={deleting}
                             >
-                                Cancel
+                                {i18n.t("common.actions.cancel")}
                             </Button>
                             <Button
                                 mode="contained"
@@ -478,7 +501,7 @@ const ProductDetails = () => {
                                 loading={deleting}
                                 disabled={deleting}
                             >
-                                Delete
+                                {i18n.t("common.actions.delete")}
                             </Button>
                         </Dialog.Actions>
                     </Dialog>
@@ -488,13 +511,11 @@ const ProductDetails = () => {
                         style={styles.dialog}
                     >
                         <Dialog.Title style={styles.dialogTitle}>
-                            Cannot delete product
+                            {i18n.t("inventory.details.deleteBlockedTitle")}
                         </Dialog.Title>
                         <Dialog.Content>
                             <Text style={styles.meta}>
-                                You cannot delete a product that has remaining
-                                stock. Please reduce the stock to zero before
-                                deleting.
+                                {i18n.t("inventory.details.deleteBlockedBody")}
                             </Text>
                         </Dialog.Content>
                         <Dialog.Actions>
@@ -505,7 +526,7 @@ const ProductDetails = () => {
                                     setDeleteDialogOpen(false);
                                 }}
                             >
-                                OK
+                                {i18n.t("common.actions.ok")}
                             </Button>
                         </Dialog.Actions>
                     </Dialog>
@@ -515,12 +536,11 @@ const ProductDetails = () => {
                         style={styles.dialog}
                     >
                         <Dialog.Title style={styles.dialogTitle}>
-                            Delete batch?
+                            {i18n.t("inventory.details.deleteBatchTitle")}
                         </Dialog.Title>
                         <Dialog.Content>
                             <Text style={styles.meta}>
-                                This will remove the batch and adjust product
-                                stock.
+                                {i18n.t("inventory.details.deleteBatchBody")}
                             </Text>
                         </Dialog.Content>
                         <Dialog.Actions>
@@ -529,7 +549,7 @@ const ProductDetails = () => {
                                 onPress={() => setBatchDeleteOpen(false)}
                                 disabled={batchDeleting}
                             >
-                                Cancel
+                                {i18n.t("common.actions.cancel")}
                             </Button>
                             <Button
                                 mode="contained"
@@ -538,7 +558,7 @@ const ProductDetails = () => {
                                 loading={batchDeleting}
                                 disabled={batchDeleting}
                             >
-                                Delete
+                                {i18n.t("common.actions.delete")}
                             </Button>
                         </Dialog.Actions>
                     </Dialog>
@@ -554,10 +574,16 @@ const ProductDetails = () => {
                                 style={styles.sheetTitle}
                             >
                                 {sheet === "edit-product"
-                                    ? "Edit Product"
+                                    ? i18n.t(
+                                          "inventory.details.editProductTitle",
+                                      )
                                     : sheet === "edit-stock"
-                                      ? "Edit Batch Stock"
-                                      : "Add Stock"}
+                                      ? i18n.t(
+                                            "inventory.details.editBatchTitle",
+                                        )
+                                      : i18n.t(
+                                            "inventory.details.addStockTitle",
+                                        )}
                             </Text>
                             <IconButton
                                 icon="close"
@@ -569,7 +595,7 @@ const ProductDetails = () => {
                             <View style={{ gap: 8 }}>
                                 <View>
                                     <Text style={styles.sheetLabel}>
-                                        Product Name
+                                        {i18n.t("common.labels.productName")}
                                     </Text>
                                     <TextInput
                                         mode="outlined"
@@ -585,7 +611,7 @@ const ProductDetails = () => {
                                 <View style={styles.sheetGrid}>
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.sheetLabel}>
-                                            Unit
+                                            {i18n.t("common.labels.unit")}
                                         </Text>
                                         <TextInput
                                             mode="outlined"
@@ -600,7 +626,7 @@ const ProductDetails = () => {
                                     </View>
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.sheetLabel}>
-                                            Unit Price
+                                            {i18n.t("common.labels.unitPrice")}
                                         </Text>
                                         <TextInput
                                             mode="outlined"
@@ -613,7 +639,9 @@ const ProductDetails = () => {
                                             }
                                             style={styles.sheetInput}
                                             left={
-                                                <TextInput.Affix text="ETB" />
+                                                <TextInput.Affix
+                                                    text={currencyPrefix}
+                                                />
                                             }
                                         />
                                     </View>
@@ -624,7 +652,7 @@ const ProductDetails = () => {
                                 <View style={styles.sheetGrid}>
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.sheetLabel}>
-                                            Quantity
+                                            {i18n.t("common.labels.quantity")}
                                         </Text>
                                         <TextInput
                                             mode="outlined"
@@ -640,7 +668,7 @@ const ProductDetails = () => {
                                     </View>
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.sheetLabel}>
-                                            Unit Cost
+                                            {i18n.t("common.labels.unitCost")}
                                         </Text>
                                         <TextInput
                                             mode="outlined"
@@ -653,7 +681,9 @@ const ProductDetails = () => {
                                             }
                                             style={styles.sheetInput}
                                             left={
-                                                <TextInput.Affix text="ETB" />
+                                                <TextInput.Affix
+                                                    text={currencyPrefix}
+                                                />
                                             }
                                         />
                                     </View>
@@ -661,7 +691,7 @@ const ProductDetails = () => {
 
                                 <View>
                                     <Text style={styles.sheetLabel}>
-                                        Date Received
+                                        {i18n.t("common.labels.dateReceived")}
                                     </Text>
                                     <TextInput
                                         mode="outlined"
@@ -686,7 +716,7 @@ const ProductDetails = () => {
                                 style={{ flex: 1 }}
                                 onPress={() => setSheet(null)}
                             >
-                                Cancel
+                                {i18n.t("common.actions.cancel")}
                             </Button>
                             <Button
                                 mode="contained"
@@ -695,7 +725,7 @@ const ProductDetails = () => {
                                 loading={saving}
                                 disabled={saving}
                             >
-                                Save
+                                {i18n.t("common.actions.save")}
                             </Button>
                         </View>
                     </Modal>
@@ -715,7 +745,7 @@ const InfoCell = ({ label, value, tone }) => (
 const getStockStatus = (stock) => {
     if (stock === 0)
         return {
-            label: "Out of stock",
+            label: i18n.t("common.status.outOfStock"),
             bg: "#FEE2E2",
             dot: theme.colors.error,
             badgeBg: "#FDE8E8",
@@ -724,7 +754,7 @@ const getStockStatus = (stock) => {
         };
     if (stock <= 5)
         return {
-            label: "Low stock",
+            label: i18n.t("common.status.lowStock"),
             bg: "#FEF3C7",
             dot: theme.colors.warning,
             badgeBg: "#FEF3C7",
@@ -732,7 +762,7 @@ const getStockStatus = (stock) => {
             icon: theme.colors.warning,
         };
     return {
-        label: "In stock",
+        label: i18n.t("common.status.inStock"),
         bg: "#E7F5ED",
         dot: theme.colors.secondary,
         badgeBg: "#E7F5ED",

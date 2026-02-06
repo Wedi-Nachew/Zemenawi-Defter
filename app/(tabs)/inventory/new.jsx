@@ -11,26 +11,33 @@ import {
     TextInput,
 } from "react-native-paper";
 import FormScreen from "../../../src/components/FormScreen";
+import i18n from "../../../src/i18n";
+import { useLanguage } from "../../../src/i18n/LanguageContext";
 import { addStock } from "../../../src/services/inventoryService";
 import { createProduct } from "../../../src/services/productService";
 import theme from "../../../src/theme";
 
-const unitOptions = [
-    "kg",
-    "g",
-    "liter",
-    "ml",
-    "pcs",
-    "box",
-    "pack",
-    "bag",
-    "crate",
-    "carton",
-    "bundle",
-    "other",
-];
-
 const AddProductScreen = () => {
+    const { language } = useLanguage();
+    const currencyPrefix = i18n.t("common.currency.prefix");
+    const formatDateInput = (date) => date.toISOString().slice(0, 10);
+    const unitOptions = useMemo(
+        () => [
+            { value: "kg", label: i18n.t("inventory.units.kg") },
+            { value: "g", label: i18n.t("inventory.units.g") },
+            { value: "liter", label: i18n.t("inventory.units.liter") },
+            { value: "ml", label: i18n.t("inventory.units.ml") },
+            { value: "pcs", label: i18n.t("inventory.units.pcs") },
+            { value: "box", label: i18n.t("inventory.units.box") },
+            { value: "pack", label: i18n.t("inventory.units.pack") },
+            { value: "bag", label: i18n.t("inventory.units.bag") },
+            { value: "crate", label: i18n.t("inventory.units.crate") },
+            { value: "carton", label: i18n.t("inventory.units.carton") },
+            { value: "bundle", label: i18n.t("inventory.units.bundle") },
+            { value: "other", label: i18n.t("inventory.units.other") },
+        ],
+        [language],
+    );
     const [name, setName] = useState("");
     const [unit, setUnit] = useState("kg");
     const [customUnit, setCustomUnit] = useState("");
@@ -38,7 +45,7 @@ const AddProductScreen = () => {
     const [unitCost, setUnitCost] = useState("");
     const [quantity, setQuantity] = useState(1);
     const [dateReceived, setDateReceived] = useState(
-        new Date().toLocaleDateString(),
+        formatDateInput(new Date()),
     );
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState("");
@@ -53,27 +60,27 @@ const AddProductScreen = () => {
         const qtyValue = Number(quantity);
 
         if (!trimmedName) {
-            setSaveError("Product name is required.");
+            setSaveError(i18n.t("inventory.new.errors.nameRequired"));
             return;
         }
 
         if (!selectedUnit) {
-            setSaveError("Unit is required.");
+            setSaveError(i18n.t("inventory.new.errors.unitRequired"));
             return;
         }
 
         if (!priceValue || priceValue <= 0) {
-            setSaveError("Default selling price must be greater than zero.");
+            setSaveError(i18n.t("inventory.new.errors.priceInvalid"));
             return;
         }
 
         if (!costValue || costValue <= 0) {
-            setSaveError("Unit cost must be greater than zero.");
+            setSaveError(i18n.t("inventory.new.errors.costInvalid"));
             return;
         }
 
         if (!qtyValue || qtyValue <= 0) {
-            setSaveError("Quantity must be greater than zero.");
+            setSaveError(i18n.t("inventory.new.errors.qtyInvalid"));
             return;
         }
 
@@ -97,7 +104,7 @@ const AddProductScreen = () => {
             router.back();
         } catch (error) {
             console.error("Failed to save product", error);
-            setSaveError("Unable to save product. Please try again.");
+            setSaveError(i18n.t("inventory.new.errors.saveFailed"));
         } finally {
             setSaving(false);
         }
@@ -107,7 +114,7 @@ const AddProductScreen = () => {
         <>
             <Stack.Screen
                 options={{
-                    headerTitle: "Add New Product",
+                    headerTitle: i18n.t("inventory.new.title"),
                     headerTitleAlign: "center",
                     headerTitleStyle: {
                         fontWeight: "700",
@@ -117,12 +124,14 @@ const AddProductScreen = () => {
             />
             <FormScreen style={styles.container}>
                 <View style={styles.fieldBlock}>
-                    <Text style={styles.label}>Product Name</Text>
+                    <Text style={styles.label}>
+                        {i18n.t("common.labels.productName")}
+                    </Text>
                     <TextInput
                         mode="outlined"
                         value={name}
                         onChangeText={setName}
-                        placeholder="e.g., Sugar, Soap, Pasta"
+                        placeholder={i18n.t("inventory.new.namePlaceholder")}
                         outlineColor="#E5E7EB"
                         activeOutlineColor={theme.colors.primary}
                         style={styles.input}
@@ -130,20 +139,22 @@ const AddProductScreen = () => {
                 </View>
 
                 <View style={styles.fieldBlock}>
-                    <Text style={styles.label}>Unit Type</Text>
+                    <Text style={styles.label}>
+                        {i18n.t("common.labels.unitType")}
+                    </Text>
                     <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.unitRow}
                     >
                         {unitOptions.map((opt) => {
-                            const selected = unit === opt;
+                            const selected = unit === opt.value;
                             return (
                                 <Chip
-                                    key={opt}
+                                    key={opt.value}
                                     mode={selected ? "flat" : "outlined"}
                                     selected={selected}
-                                    onPress={() => setUnit(opt)}
+                                    onPress={() => setUnit(opt.value)}
                                     compact
                                     style={[
                                         styles.unitChip,
@@ -156,7 +167,7 @@ const AddProductScreen = () => {
                                         fontWeight: "600",
                                     }}
                                 >
-                                    {opt}
+                                    {opt.label}
                                 </Chip>
                             );
                         })}
@@ -166,7 +177,9 @@ const AddProductScreen = () => {
                             mode="outlined"
                             value={customUnit}
                             onChangeText={setCustomUnit}
-                            placeholder="Enter unit"
+                            placeholder={i18n.t(
+                                "inventory.new.unitPlaceholder",
+                            )}
                             outlineColor="#E5E7EB"
                             activeOutlineColor={theme.colors.primary}
                             style={styles.input}
@@ -175,19 +188,21 @@ const AddProductScreen = () => {
                 </View>
 
                 <View style={styles.fieldBlock}>
-                    <Text style={styles.label}>Default Selling Price</Text>
+                    <Text style={styles.label}>
+                        {i18n.t("common.labels.defaultSellingPrice")}
+                    </Text>
                     <TextInput
                         mode="outlined"
                         value={price}
                         onChangeText={setPrice}
-                        placeholder="ETB 0.00"
+                        placeholder={i18n.t("inventory.new.pricePlaceholder")}
                         keyboardType="numeric"
                         outlineColor="#E5E7EB"
                         activeOutlineColor={theme.colors.primary}
                         style={styles.input}
                         left={
                             <TextInput.Affix
-                                text="ETB"
+                                text={currencyPrefix}
                                 textStyle={styles.affix}
                             />
                         }
@@ -205,24 +220,28 @@ const AddProductScreen = () => {
                                 />
                             </View>
                             <Text style={styles.batchTitle}>
-                                First Batch Details
+                                {i18n.t("common.labels.firstBatchDetails")}
                             </Text>
                         </View>
                         <View style={styles.inlineRow}>
                             <View style={{ flex: 1, gap: 4 }}>
-                                <Text style={styles.label}>Unit Cost</Text>
+                                <Text style={styles.label}>
+                                    {i18n.t("common.labels.unitCost")}
+                                </Text>
                                 <TextInput
                                     mode="outlined"
                                     value={unitCost}
                                     onChangeText={setUnitCost}
-                                    placeholder="0"
+                                    placeholder={i18n.t(
+                                        "inventory.new.quantityPlaceholder",
+                                    )}
                                     keyboardType="numeric"
                                     outlineColor="#E5E7EB"
                                     activeOutlineColor={theme.colors.primary}
                                     style={styles.input}
                                     left={
                                         <TextInput.Affix
-                                            text="ETB"
+                                            text={currencyPrefix}
                                             textStyle={styles.affix}
                                         />
                                     }
@@ -230,7 +249,9 @@ const AddProductScreen = () => {
                             </View>
                             <View style={{ width: 12 }} />
                             <View style={{ flex: 1, gap: 4 }}>
-                                <Text style={styles.label}>Quantity</Text>
+                                <Text style={styles.label}>
+                                    {i18n.t("common.labels.quantity")}
+                                </Text>
                                 <TextInput
                                     mode="outlined"
                                     value={quantityLabel}
@@ -288,7 +309,9 @@ const AddProductScreen = () => {
                         </View>
 
                         <View>
-                            <Text style={styles.label}>Date Received</Text>
+                            <Text style={styles.label}>
+                                {i18n.t("common.labels.dateReceived")}
+                            </Text>
                             <TextInput
                                 mode="outlined"
                                 value={dateReceived}
@@ -316,12 +339,14 @@ const AddProductScreen = () => {
                     loading={saving}
                     disabled={saving}
                 >
-                    Save Product
+                    {i18n.t("inventory.new.saveProduct")}
                 </Button>
                 {saving && (
                     <View style={styles.loadingRow}>
                         <ActivityIndicator animating />
-                        <Text style={styles.metaText}>Saving product…</Text>
+                        <Text style={styles.metaText}>
+                            {i18n.t("inventory.new.savingProduct")}
+                        </Text>
                     </View>
                 )}
                 {!!saveError && !saving && (

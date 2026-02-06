@@ -1,5 +1,5 @@
 import { router, Stack } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, StyleSheet, View } from "react-native";
 import {
     ActivityIndicator,
@@ -12,50 +12,83 @@ import {
 } from "react-native-paper";
 import InitialAvatar from "../../../src/components/InitialAvatar";
 import Screen from "../../../src/components/Screen";
+import database from "../../../src/database";
+import i18n from "../../../src/i18n";
+import { useLanguage } from "../../../src/i18n/LanguageContext";
 import { getCustomersWithBalances } from "../../../src/services/creditService";
 import theme from "../../../src/theme";
 
 const CustomerCreditsScreen = () => {
+    const { language } = useLanguage();
+    const currencyPrefix = useMemo(
+        () => i18n.t("common.currency.prefix"),
+        [language],
+    );
     const [filter, setFilter] = useState("all");
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(false);
     const [customers, setCustomers] = useState([]);
     const [error, setError] = useState("");
 
-    useEffect(() => {
+    const loadCustomers = useCallback(async () => {
         let active = true;
-
-        const loadCustomers = async () => {
-            setLoading(true);
-            try {
-                setError("");
-                const rows = await getCustomersWithBalances({
-                    search: query,
-                    filter,
-                });
-                if (!active) return;
-                setCustomers(
-                    rows.map(({ customer, balance }) => ({
-                        id: customer.id,
-                        name: customer.name,
-                        phone: customer.phone || "",
-                        balance,
-                    })),
-                );
-            } catch (error) {
-                console.error("Failed to load customers", error);
-                if (active) setError("Unable to load customers.");
-            } finally {
-                if (active) setLoading(false);
-            }
-        };
-
-        loadCustomers();
+        setLoading(true);
+        try {
+            setError("");
+            const rows = await getCustomersWithBalances({
+                search: query,
+                filter,
+            });
+            if (!active) return;
+            setCustomers(
+                rows.map(({ customer, balance }) => ({
+                    id: customer.id,
+                    name: customer.name,
+                    phone: customer.phone || "",
+                    balance,
+                })),
+            );
+        } catch (error) {
+            console.error("Failed to load customers", error);
+            if (active) setError(i18n.t("credits.errors.loadCustomers"));
+        } finally {
+            if (active) setLoading(false);
+        }
 
         return () => {
             active = false;
         };
     }, [filter, query]);
+
+    useEffect(() => {
+        const cleanup = loadCustomers();
+        return () => {
+            if (typeof cleanup === "function") cleanup();
+        };
+    }, [loadCustomers]);
+
+    useEffect(() => {
+        const customersCollection = database.collections.get("customers");
+        const salesCollection = database.collections.get("sales");
+        const saleItemsCollection = database.collections.get("sale_items");
+        const creditPaymentsCollection =
+            database.collections.get("credit_payments");
+        const creditPaymentItemsCollection = database.collections.get(
+            "credit_payment_items",
+        );
+
+        const subscriptions = [
+            customersCollection.query().observe(),
+            salesCollection.query().observe(),
+            saleItemsCollection.query().observe(),
+            creditPaymentsCollection.query().observe(),
+            creditPaymentItemsCollection.query().observe(),
+        ].map((observable) => observable.subscribe(() => loadCustomers()));
+
+        return () => {
+            subscriptions.forEach((sub) => sub.unsubscribe());
+        };
+    }, [loadCustomers]);
 
     const totalOutstanding = customers.reduce((sum, c) => sum + c.balance, 0);
 
@@ -65,7 +98,7 @@ const CustomerCreditsScreen = () => {
         <>
             <Stack.Screen
                 options={{
-                    headerTitle: "Credits",
+                    headerTitle: i18n.t("credits.title"),
                     headerTitleStyle: {
                         fontSize: 22,
                         fontWeight: "700",
@@ -87,17 +120,18 @@ const CustomerCreditsScreen = () => {
                     <Card.Content style={styles.summaryContent}>
                         <View style={{ gap: 6 }}>
                             <Text style={styles.summaryLabel}>
-                                Total Outstanding Credit
+                                {i18n.t("credits.summaryTotal")}
                             </Text>
                             <Text
                                 variant="headlineMedium"
                                 style={styles.summaryValue}
                             >
-                                ETB {totalOutstanding.toLocaleString()}
+                                {currencyPrefix}{" "}
+                                {totalOutstanding.toLocaleString()}
                             </Text>
                         </View>
                         <Button mode="contained" compact onPress={() => {}}>
-                            View History
+                            {i18n.t("credits.actions.viewHistory")}
                         </Button>
                     </Card.Content>
                 </Card>
@@ -105,7 +139,7 @@ const CustomerCreditsScreen = () => {
                 <Searchbar
                     value={query}
                     onChangeText={setQuery}
-                    placeholder="Search customers..."
+                    placeholder={i18n.t("credits.searchPlaceholder")}
                     style={styles.search}
                     inputStyle={{ fontSize: 15 }}
                     iconColor={theme.colors.onSurface}
@@ -128,7 +162,7 @@ const CustomerCreditsScreen = () => {
                             filter === "all" && styles.filterChipActive,
                         ]}
                     >
-                        All
+                        {i18n.t("credits.filters.all")}
                     </Chip>
                     <Chip
                         selected={filter === "balance"}
@@ -146,7 +180,7 @@ const CustomerCreditsScreen = () => {
                             filter === "balance" && styles.filterChipActive,
                         ]}
                     >
-                        Has Balance
+                        {i18n.t("credits.filters.hasBalance")}
                     </Chip>
                     <Chip
                         selected={filter === "paid"}
@@ -164,7 +198,7 @@ const CustomerCreditsScreen = () => {
                             filter === "paid" && styles.filterChipActive,
                         ]}
                     >
-                        Paid Off
+                        {i18n.t("credits.filters.paidOff")}
                     </Chip>
                 </View>
 
@@ -172,7 +206,9 @@ const CustomerCreditsScreen = () => {
                     <Card style={styles.card}>
                         <Card.Content style={styles.cardContent}>
                             <ActivityIndicator />
-                            <Text style={styles.meta}>Loading credits…</Text>
+                            <Text style={styles.meta}>
+                                {i18n.t("credits.loading")}
+                            </Text>
                         </Card.Content>
                     </Card>
                 ) : error ? (
@@ -184,7 +220,9 @@ const CustomerCreditsScreen = () => {
                 ) : filteredCustomers.length === 0 ? (
                     <Card style={styles.card}>
                         <Card.Content>
-                            <Text style={styles.meta}>No customers found.</Text>
+                            <Text style={styles.meta}>
+                                {i18n.t("credits.empty")}
+                            </Text>
                         </Card.Content>
                     </Card>
                 ) : (
@@ -223,7 +261,7 @@ const CustomerCreditsScreen = () => {
                                             }}
                                         >
                                             <Text style={styles.balanceValue}>
-                                                ETB{" "}
+                                                {currencyPrefix}{" "}
                                                 {item.balance.toLocaleString()}
                                             </Text>
                                             <Chip
@@ -243,8 +281,12 @@ const CustomerCreditsScreen = () => {
                                                 }}
                                             >
                                                 {item.balance > 0
-                                                    ? "Has Balance"
-                                                    : "Paid"}
+                                                    ? i18n.t(
+                                                          "credits.status.hasBalance",
+                                                      )
+                                                    : i18n.t(
+                                                          "credits.status.paid",
+                                                      )}
                                             </Chip>
                                         </View>
                                     </View>

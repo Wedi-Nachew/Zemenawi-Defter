@@ -2,6 +2,7 @@ import { StyleSheet, View } from "react-native";
 
 import { router } from "expo-router";
 import { Button, Card, Divider, Icon, Text } from "react-native-paper";
+import i18n from "../i18n";
 import theme from "../theme";
 
 const LowStockAlert = ({ items }) => {
@@ -11,7 +12,9 @@ const LowStockAlert = ({ items }) => {
         <>
             <View style={styles.header}>
                 <View style={styles.titleContainer}>
-                    <Text style={styles.title}>Low Stock Alerts</Text>
+                    <Text style={styles.title}>
+                        {i18n.t("home.stock.alertTitle")}
+                    </Text>
                     <Icon
                         source="alert"
                         color={theme.colors.warning}
@@ -24,7 +27,7 @@ const LowStockAlert = ({ items }) => {
                     labelStyle={styles.viewInventoryLabel}
                     compact
                 >
-                    View Inventory
+                    {i18n.t("home.stock.viewInventory")}
                 </Button>
             </View>
             <Card style={styles.card}>

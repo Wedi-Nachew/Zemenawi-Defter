@@ -84,6 +84,53 @@ const getSaleItemRemainingBalance = async (saleItem) => {
     return total - paid;
 };
 
+const getSalePaymentSummary = async (sale) => {
+    const soldAt = sale?.soldAt || null;
+    const items = await sale.saleItems.fetch();
+
+    let total = 0;
+    let totalPaid = 0;
+    let initialPaid = 0;
+    const paymentCache = new Map();
+
+    for (const item of items) {
+        const lineTotal = item.sellingPrice * item.quantity;
+        total += lineTotal;
+
+        const paymentItems = await item.creditPaymentItems.fetch();
+        for (const paymentItem of paymentItems) {
+            const amount = paymentItem.amountApplied || 0;
+            totalPaid += amount;
+
+            const paymentId = paymentItem.creditPaymentId;
+            let paidAt = null;
+
+            if (paymentId) {
+                if (paymentCache.has(paymentId)) {
+                    paidAt = paymentCache.get(paymentId);
+                } else {
+                    const payment = await paymentItem.creditPayment.fetch();
+                    paidAt = payment?.paidAt || null;
+                    paymentCache.set(paymentId, paidAt);
+                }
+            }
+
+            if (soldAt && paidAt && Math.abs(paidAt - soldAt) <= 1000) {
+                initialPaid += amount;
+            }
+        }
+    }
+
+    const remainingBalance = Math.max(0, total - totalPaid);
+
+    return {
+        total,
+        totalPaid,
+        initialPaid,
+        remainingBalance,
+    };
+};
+
 const getCustomerTotalCreditBalance = async (customer) => {
     const sales = await customer.sales.fetch();
     let totalBalance = 0;
@@ -222,6 +269,7 @@ export {
     getCustomerTotalCreditBalance,
     getCustomerUnpaidItems,
     getSaleItemRemainingBalance,
+    getSalePaymentSummary,
     getUnpaidSaleItemsFIFO,
     payGenericFIFO,
     payTowardSaleItems,

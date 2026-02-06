@@ -1,5 +1,5 @@
 import { router, Stack, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, StyleSheet, View } from "react-native";
 import {
     Card,
@@ -11,10 +11,18 @@ import {
     Text,
 } from "react-native-paper";
 import Screen from "../../../src/components/Screen";
+import database from "../../../src/database";
+import i18n from "../../../src/i18n";
+import { useLanguage } from "../../../src/i18n/LanguageContext";
 import { getProducts } from "../../../src/services/productService";
 import theme from "../../../src/theme";
 
 const ProductsScreen = () => {
+    const { language } = useLanguage();
+    const currencyPrefix = useMemo(
+        () => i18n.t("common.currency.prefix"),
+        [language],
+    );
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -35,7 +43,7 @@ const ProductsScreen = () => {
             setProducts(result);
         } catch (error) {
             console.error("Failed to load products", error);
-            if (active) setError("Unable to load products.");
+            if (active) setError(i18n.t("inventory.errors.load"));
         } finally {
             if (active) setLoading(false);
         }
@@ -60,6 +68,17 @@ const ProductsScreen = () => {
             };
         }, [loadProducts]),
     );
+
+    useEffect(() => {
+        const productsCollection = database.collections.get("products");
+        const subscriptions = [productsCollection.query().observe()].map(
+            (observable) => observable.subscribe(() => loadProducts()),
+        );
+
+        return () => {
+            subscriptions.forEach((sub) => sub.unsubscribe());
+        };
+    }, [loadProducts]);
 
     const renderItem = ({ item }) => {
         const status = getStockStatus(item.stock);
@@ -91,7 +110,8 @@ const ProductsScreen = () => {
                             {item.name}
                         </Text>
                         <Text style={styles.meta}>
-                            ETB {item.defaultSellingPrice.toLocaleString()} /{" "}
+                            {currencyPrefix}{" "}
+                            {item.defaultSellingPrice.toLocaleString()} /{" "}
                             {item.unit}
                         </Text>
                     </View>
@@ -125,7 +145,7 @@ const ProductsScreen = () => {
         <>
             <Stack.Screen
                 options={{
-                    headerTitle: "Products",
+                    headerTitle: i18n.t("inventory.title"),
                     headerTitleStyle: {
                         fontSize: 22,
                         fontWeight: "700",
@@ -146,7 +166,7 @@ const ProductsScreen = () => {
                 <Searchbar
                     value={query}
                     onChangeText={setQuery}
-                    placeholder="Search inventory..."
+                    placeholder={i18n.t("inventory.searchPlaceholder")}
                     style={styles.search}
                     inputStyle={{ fontSize: 16 }}
                     iconColor={theme.colors.primary}
@@ -169,7 +189,7 @@ const ProductsScreen = () => {
                             filter === "all" && styles.filterChipActive,
                         ]}
                     >
-                        All
+                        {i18n.t("inventory.filters.all")}
                     </Chip>
                     <Chip
                         selected={filter === "low"}
@@ -187,7 +207,7 @@ const ProductsScreen = () => {
                             filter === "low" && styles.filterChipActive,
                         ]}
                     >
-                        Low Stock
+                        {i18n.t("inventory.filters.lowStock")}
                     </Chip>
                     <Chip
                         selected={filter === "out"}
@@ -205,7 +225,7 @@ const ProductsScreen = () => {
                             filter === "out" && styles.filterChipActive,
                         ]}
                     >
-                        Out of Stock
+                        {i18n.t("inventory.filters.outOfStock")}
                     </Chip>
                 </View>
 
@@ -229,18 +249,20 @@ const ProductsScreen = () => {
                     ListEmptyComponent={
                         loading ? (
                             <View style={styles.emptyState}>
-                                <Text style={styles.emptyTitle}>Loading…</Text>
+                                <Text style={styles.emptyTitle}>
+                                    {i18n.t("inventory.loading.title")}
+                                </Text>
                                 <Text style={styles.emptySubtitle}>
-                                    Fetching inventory items.
+                                    {i18n.t("inventory.loading.subtitle")}
                                 </Text>
                             </View>
                         ) : (
                             <View style={styles.emptyState}>
                                 <Text style={styles.emptyTitle}>
-                                    No products found
+                                    {i18n.t("inventory.empty.title")}
                                 </Text>
                                 <Text style={styles.emptySubtitle}>
-                                    Add products or adjust your search.
+                                    {i18n.t("inventory.empty.subtitle")}
                                 </Text>
                             </View>
                         )

@@ -1,5 +1,6 @@
+import { Q } from "@nozbe/watermelondb";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import {
     ActivityIndicator,
@@ -14,6 +15,9 @@ import {
     TextInput,
 } from "react-native-paper";
 import Screen from "../../../src/components/Screen";
+import database from "../../../src/database";
+import i18n from "../../../src/i18n";
+import { useLanguage } from "../../../src/i18n/LanguageContext";
 import {
     getCustomerById,
     getCustomerUnpaidItems,
@@ -23,6 +27,9 @@ import {
 import theme from "../../../src/theme";
 
 const MakePaymentScreen = () => {
+    const { language } = useLanguage();
+    const locale = language === "ti" ? "ti-ET" : "en";
+    const currencyPrefix = i18n.t("common.currency.prefix");
     const { id } = useLocalSearchParams();
     const [customer, setCustomer] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -37,7 +44,7 @@ const MakePaymentScreen = () => {
     const [lastReceiptNo, setLastReceiptNo] = useState("");
     const isMounted = useRef(true);
 
-    const loadCustomer = async () => {
+    const loadCustomer = useCallback(async () => {
         if (typeof id !== "string") return;
         setLoading(true);
         setError("");
@@ -49,9 +56,11 @@ const MakePaymentScreen = () => {
                     const product = await entry.saleItem.product.fetch();
                     return {
                         id: entry.saleItem.id,
-                        title: product?.name || "Item",
+                        title: product?.name || i18n.t("common.labels.item"),
                         date: entry.sale?.soldAt
-                            ? new Date(entry.sale.soldAt).toLocaleDateString()
+                            ? new Date(entry.sale.soldAt).toLocaleDateString(
+                                  locale,
+                              )
                             : "",
                         amount: entry.remainingBalance,
                         saleItem: entry.saleItem,
@@ -64,12 +73,12 @@ const MakePaymentScreen = () => {
         } catch (loadError) {
             console.error("Failed to load customer", loadError);
             if (isMounted.current) {
-                setError("Unable to load customer details.");
+                setError(i18n.t("credits.errors.loadCustomer"));
             }
         } finally {
             if (isMounted.current) setLoading(false);
         }
-    };
+    }, [id, language]);
 
     useEffect(() => {
         isMounted.current = true;
@@ -78,7 +87,35 @@ const MakePaymentScreen = () => {
         return () => {
             isMounted.current = false;
         };
-    }, [id]);
+    }, [loadCustomer]);
+
+    useEffect(() => {
+        if (typeof id !== "string") return;
+        const salesCollection = database.collections.get("sales");
+        const saleItemsCollection = database.collections.get("sale_items");
+        const creditPaymentsCollection =
+            database.collections.get("credit_payments");
+        const creditPaymentItemsCollection = database.collections.get(
+            "credit_payment_items",
+        );
+
+        const subscriptions = [
+            salesCollection.query(Q.where("customer_id", id)).observe(),
+            saleItemsCollection
+                .query(Q.on("sales", "customer_id", id))
+                .observe(),
+            creditPaymentsCollection
+                .query(Q.where("customer_id", id))
+                .observe(),
+            creditPaymentItemsCollection
+                .query(Q.on("credit_payments", "customer_id", id))
+                .observe(),
+        ].map((observable) => observable.subscribe(() => loadCustomer()));
+
+        return () => {
+            subscriptions.forEach((sub) => sub.unsubscribe());
+        };
+    }, [id, loadCustomer]);
 
     const totalOutstanding = useMemo(
         () => unpaidItems.reduce((sum, item) => sum + item.amount, 0),
@@ -88,9 +125,11 @@ const MakePaymentScreen = () => {
     const invoices = useMemo(() => {
         return unpaidItems.map((item, index) => ({
             ...item,
-            invoiceNo: `Inv #${String(index + 1).padStart(3, "0")}`,
+            invoiceNo: `${i18n.t("credits.payment.invoicePrefix")} ${String(
+                index + 1,
+            ).padStart(3, "0")}`,
         }));
-    }, [unpaidItems]);
+    }, [unpaidItems, language]);
 
     const parsedAmount = Number(String(amount).replace(/,/g, "")) || 0;
 
@@ -133,19 +172,19 @@ const MakePaymentScreen = () => {
     const handleConfirm = async () => {
         setError("");
         if (parsedAmount <= 0) {
-            setError("Enter a valid amount.");
+            setError(i18n.t("credits.errors.invalidAmount"));
             return;
         }
         if (parsedAmount > totalOutstanding) {
-            setError("Amount exceeds outstanding balance.");
+            setError(i18n.t("credits.errors.exceedsBalance"));
             return;
         }
         if (mode === "select" && selected.length === 0) {
-            setError("Select at least one item.");
+            setError(i18n.t("credits.errors.selectItem"));
             return;
         }
         if (mode === "select" && parsedAmount > selectedTotal) {
-            setError("Amount exceeds selected items total.");
+            setError(i18n.t("credits.errors.exceedsSelected"));
             return;
         }
 
@@ -172,7 +211,7 @@ const MakePaymentScreen = () => {
             setShowSuccess(true);
         } catch (paymentError) {
             console.error("Failed to apply payment", paymentError);
-            setError("Unable to record payment.");
+            setError(i18n.t("credits.errors.recordPayment"));
         } finally {
             setSaving(false);
         }
@@ -187,7 +226,7 @@ const MakePaymentScreen = () => {
                         onPress={() => router.back()}
                     />
                     <Text variant="titleMedium" style={styles.title}>
-                        Make Payment
+                        {i18n.t("credits.payment.title")}
                     </Text>
                     <View style={{ width: 40 }} />
                 </View>
@@ -195,8 +234,9 @@ const MakePaymentScreen = () => {
                     <Card.Content>
                         <Text style={styles.meta}>
                             {loading
-                                ? "Loading customer…"
-                                : error || "Customer not found."}
+                                ? i18n.t("credits.details.loadingCustomer")
+                                : error ||
+                                  i18n.t("credits.details.customerNotFound")}
                         </Text>
                         {loading && <ActivityIndicator />}
                     </Card.Content>
@@ -208,7 +248,9 @@ const MakePaymentScreen = () => {
     return (
         <Screen style={styles.container}>
             <View style={styles.amountBlock}>
-                <Text style={styles.label}>Amount to Pay</Text>
+                <Text style={styles.label}>
+                    {i18n.t("credits.payment.amountToPay")}
+                </Text>
                 <TextInput
                     mode="outlined"
                     value={amount}
@@ -218,7 +260,7 @@ const MakePaymentScreen = () => {
                     activeOutlineColor={theme.colors.primary}
                     style={styles.amountInput}
                     contentStyle={styles.amountContent}
-                    right={<TextInput.Affix text="ETB" />}
+                    right={<TextInput.Affix text={currencyPrefix} />}
                 />
             </View>
 
@@ -236,7 +278,7 @@ const MakePaymentScreen = () => {
                         color: mode === "auto" ? "#FFFFFF" : theme.colors.text,
                     }}
                 >
-                    Automatic (FIFO)
+                    {i18n.t("credits.payment.autoFifo")}
                 </Chip>
                 <Chip
                     selected={mode === "select"}
@@ -252,26 +294,32 @@ const MakePaymentScreen = () => {
                             mode === "select" ? "#FFFFFF" : theme.colors.text,
                     }}
                 >
-                    Select Items
+                    {i18n.t("credits.payment.selectItems")}
                 </Chip>
             </View>
 
             <View style={styles.sectionHeader}>
-                <Text style={styles.sectionLabel}>Unpaid invoices</Text>
+                <Text style={styles.sectionLabel}>
+                    {i18n.t("credits.payment.unpaidInvoices")}
+                </Text>
                 <Chip
                     compact
                     mode="outlined"
                     style={styles.selectedChip}
                     textStyle={styles.selectedChipText}
                 >
-                    {activeSelected.length} selected
+                    {i18n.t("credits.payment.selectedCount", {
+                        count: activeSelected.length,
+                    })}
                 </Chip>
             </View>
 
             <Card style={styles.card}>
                 <Card.Content style={{ gap: 12 }}>
                     {invoices.length === 0 && (
-                        <Text style={styles.meta}>No unpaid items.</Text>
+                        <Text style={styles.meta}>
+                            {i18n.t("credits.payment.noUnpaid")}
+                        </Text>
                     )}
                     {invoices.map((inv) => {
                         const isSelected = activeSelected.includes(inv.id);
@@ -313,7 +361,8 @@ const MakePaymentScreen = () => {
                                         </Text>
                                     </View>
                                     <Text style={styles.invoiceAmount}>
-                                        ETB {inv.amount.toLocaleString()}
+                                        {currencyPrefix}{" "}
+                                        {inv.amount.toLocaleString()}
                                     </Text>
                                 </View>
                             </Pressable>
@@ -323,8 +372,12 @@ const MakePaymentScreen = () => {
             </Card>
 
             <View style={styles.totalRow}>
-                <Text style={styles.meta}>Total Allocating</Text>
-                <Text style={styles.totalValue}>ETB {amount}</Text>
+                <Text style={styles.meta}>
+                    {i18n.t("credits.payment.totalAllocating")}
+                </Text>
+                <Text style={styles.totalValue}>
+                    {currencyPrefix} {amount}
+                </Text>
             </View>
 
             {!!error && <Text style={styles.errorText}>{error}</Text>}
@@ -338,7 +391,7 @@ const MakePaymentScreen = () => {
                 loading={saving}
                 disabled={saving}
             >
-                Confirm Payment
+                {i18n.t("credits.actions.confirmPayment")}
             </Button>
 
             <Portal>
@@ -354,10 +407,10 @@ const MakePaymentScreen = () => {
                         </View>
                         <View>
                             <Text style={styles.successTitle}>
-                                Payment Successful
+                                {i18n.t("credits.payment.successTitle")}
                             </Text>
                             <Text style={styles.successSubtitle}>
-                                Transaction completed successfully
+                                {i18n.t("credits.payment.successSubtitle")}
                             </Text>
                         </View>
                     </View>
@@ -366,36 +419,44 @@ const MakePaymentScreen = () => {
                         <Card.Content style={{ gap: 12 }}>
                             <View style={styles.amountBlock}>
                                 <Text style={styles.amountLabel}>
-                                    Amount Paid
+                                    {i18n.t("common.labels.amountPaid")}
                                 </Text>
                                 <Text style={styles.amountValue}>
-                                    ETB {lastPaidAmount.toLocaleString()}
+                                    {currencyPrefix}{" "}
+                                    {lastPaidAmount.toLocaleString()}
                                 </Text>
                             </View>
                             <View style={styles.rowBetween}>
-                                <Text style={styles.meta}>Receipt No</Text>
+                                <Text style={styles.meta}>
+                                    {i18n.t("common.labels.receiptNo")}
+                                </Text>
                                 <Text style={styles.metaStrong}>
                                     {lastReceiptNo || "-"}
                                 </Text>
                             </View>
                             <View style={styles.rowBetween}>
-                                <Text style={styles.meta}>Customer</Text>
-                                <Text style={styles.metaStrong}>
-                                    {customer?.name ?? "Customer"}
+                                <Text style={styles.meta}>
+                                    {i18n.t("common.labels.customer")}
                                 </Text>
-                            </View>
-                            <View style={styles.rowBetween}>
-                                <Text style={styles.meta}>Date</Text>
                                 <Text style={styles.metaStrong}>
-                                    {new Date().toLocaleString()}
+                                    {customer?.name ??
+                                        i18n.t("common.labels.customer")}
                                 </Text>
                             </View>
                             <View style={styles.rowBetween}>
                                 <Text style={styles.meta}>
-                                    Remaining Balance
+                                    {i18n.t("common.labels.date")}
                                 </Text>
                                 <Text style={styles.metaStrong}>
-                                    ETB{" "}
+                                    {new Date().toLocaleString(locale)}
+                                </Text>
+                            </View>
+                            <View style={styles.rowBetween}>
+                                <Text style={styles.meta}>
+                                    {i18n.t("common.labels.remainingBalance")}
+                                </Text>
+                                <Text style={styles.metaStrong}>
+                                    {currencyPrefix}{" "}
                                     {Math.max(
                                         totalOutstanding - lastPaidAmount,
                                         0,
@@ -410,7 +471,7 @@ const MakePaymentScreen = () => {
                         onPress={() => setShowSuccess(false)}
                         style={styles.doneButton}
                     >
-                        Done
+                        {i18n.t("common.actions.done")}
                     </Button>
                 </Modal>
             </Portal>

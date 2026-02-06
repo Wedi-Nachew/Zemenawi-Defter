@@ -3,6 +3,8 @@ import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { Button, Card, Icon, Text } from "react-native-paper";
 import Screen from "../../../src/components/Screen";
+import i18n from "../../../src/i18n";
+import { useLanguage } from "../../../src/i18n/LanguageContext";
 import theme from "../../../src/theme";
 
 const creditCatalog = {
@@ -11,6 +13,9 @@ const creditCatalog = {
 };
 
 const PaymentSuccessScreen = () => {
+    const { language } = useLanguage();
+    const locale = language === "ti" ? "ti-ET" : "en";
+    const currencyPrefix = i18n.t("common.currency.prefix");
     const { id, amount } = useLocalSearchParams();
 
     const receipt = useMemo(
@@ -28,40 +33,54 @@ const PaymentSuccessScreen = () => {
                 <View style={styles.checkWrap}>
                     <Icon source="check" size={24} color="#FFFFFF" />
                 </View>
-                <Text style={styles.heroTitle}>Payment Successful</Text>
+                <Text style={styles.heroTitle}>
+                    {i18n.t("credits.success.title")}
+                </Text>
                 <Text style={styles.heroSubtitle}>
-                    Transaction completed successfully
+                    {i18n.t("credits.success.subtitle")}
                 </Text>
             </View>
 
             <Card style={styles.receiptCard}>
                 <Card.Content style={{ gap: 12 }}>
                     <View style={styles.amountBlock}>
-                        <Text style={styles.amountLabel}>Amount Paid</Text>
+                        <Text style={styles.amountLabel}>
+                            {i18n.t("common.labels.amountPaid")}
+                        </Text>
                         <Text style={styles.amountValue}>
-                            ETB {Number(amount || 0).toLocaleString()}
+                            {currencyPrefix}{" "}
+                            {Number(amount || 0).toLocaleString()}
                         </Text>
                     </View>
                     <View style={styles.rowBetween}>
-                        <Text style={styles.meta}>Receipt No</Text>
+                        <Text style={styles.meta}>
+                            {i18n.t("common.labels.receiptNo")}
+                        </Text>
                         <Text style={styles.metaStrong}>{receipt}</Text>
                     </View>
                     <View style={styles.rowBetween}>
-                        <Text style={styles.meta}>Customer</Text>
+                        <Text style={styles.meta}>
+                            {i18n.t("common.labels.customer")}
+                        </Text>
                         <Text style={styles.metaStrong}>
-                            {customer?.name ?? "Customer"}
+                            {customer?.name ?? i18n.t("common.labels.customer")}
                         </Text>
                     </View>
                     <View style={styles.rowBetween}>
-                        <Text style={styles.meta}>Date</Text>
+                        <Text style={styles.meta}>
+                            {i18n.t("common.labels.date")}
+                        </Text>
                         <Text style={styles.metaStrong}>
-                            Oct 24, 2023 • 4:30 PM
+                            {new Date().toLocaleString(locale)}
                         </Text>
                     </View>
                     <View style={styles.rowBetween}>
-                        <Text style={styles.meta}>Remaining Balance</Text>
+                        <Text style={styles.meta}>
+                            {i18n.t("common.labels.remainingBalance")}
+                        </Text>
                         <Text style={styles.metaStrong}>
-                            ETB {customer?.balance?.toLocaleString() ?? "0"}
+                            {currencyPrefix}{" "}
+                            {customer?.balance?.toLocaleString() ?? "0"}
                         </Text>
                     </View>
                 </Card.Content>
@@ -72,7 +91,7 @@ const PaymentSuccessScreen = () => {
                 onPress={() => router.back()}
                 style={styles.doneButton}
             >
-                Done
+                {i18n.t("common.actions.done")}
             </Button>
         </Screen>
     );

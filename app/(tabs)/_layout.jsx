@@ -1,11 +1,27 @@
 import { router, Tabs } from "expo-router";
+import { useMemo } from "react";
 import { IconButton } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TabBarIcon from "../../src/components/TabBarIcon";
+import i18n from "../../src/i18n";
+import { useLanguage } from "../../src/i18n/LanguageContext";
 import theme from "../../src/theme";
 
-const TabNaviagtor = () => {
+const TabNavigator = () => {
     const insets = useSafeAreaInsets();
+    const { language } = useLanguage();
+    const labels = useMemo(
+        () => ({
+            home: "tabs.home",
+            products: "tabs.products",
+            sales: "tabs.sales",
+            credits: "tabs.credits",
+            reports: "tabs.reports",
+            appTitle: "app.title",
+            reportsTitle: "reports.headerTitle",
+        }),
+        [language],
+    );
 
     return (
         <Tabs
@@ -31,7 +47,7 @@ const TabNaviagtor = () => {
             <Tabs.Screen
                 name="index"
                 options={{
-                    title: "Home",
+                    title: i18n.t(labels.home),
                     tabBarIcon: ({ color, focused }) => (
                         <TabBarIcon
                             name="home"
@@ -40,7 +56,7 @@ const TabNaviagtor = () => {
                         />
                     ),
                     headerShown: true,
-                    headerTitle: "Zemenawi Defter",
+                    headerTitle: i18n.t(labels.appTitle),
                     headerTitleStyle: {
                         fontWeight: "700",
                         fontSize: 20,
@@ -60,7 +76,7 @@ const TabNaviagtor = () => {
             <Tabs.Screen
                 name="inventory"
                 options={{
-                    title: "Products",
+                    title: i18n.t(labels.products),
                     tabBarIcon: ({ color, focused }) => (
                         <TabBarIcon
                             name="archive"
@@ -73,7 +89,7 @@ const TabNaviagtor = () => {
             <Tabs.Screen
                 name="sales"
                 options={{
-                    title: "Sales",
+                    title: i18n.t(labels.sales),
                     tabBarIcon: ({ color, focused }) => (
                         <TabBarIcon
                             name="cart"
@@ -86,7 +102,7 @@ const TabNaviagtor = () => {
             <Tabs.Screen
                 name="credits"
                 options={{
-                    title: "Credits",
+                    title: i18n.t(labels.credits),
                     tabBarIcon: ({ color, focused }) => (
                         <TabBarIcon
                             name="wallet-bifold"
@@ -99,7 +115,7 @@ const TabNaviagtor = () => {
             <Tabs.Screen
                 name="reports"
                 options={{
-                    title: "Reports",
+                    title: i18n.t(labels.reports),
                     tabBarIcon: ({ color, focused }) => (
                         <TabBarIcon
                             name="chart-box"
@@ -108,7 +124,7 @@ const TabNaviagtor = () => {
                         />
                     ),
                     headerShown: true,
-                    headerTitle: "Profit Analysis",
+                    headerTitle: i18n.t(labels.reportsTitle),
                     headerTitleStyle: {
                         fontSize: 22,
                         fontWeight: "700",
@@ -119,4 +135,4 @@ const TabNaviagtor = () => {
     );
 };
 
-export default TabNaviagtor;
+export default TabNavigator;

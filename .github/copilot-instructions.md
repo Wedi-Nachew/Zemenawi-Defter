@@ -2,22 +2,23 @@
 
 ## Big picture architecture
 
-- Expo Router file-based navigation lives under app/ (tabs in app/(tabs)/\_layout.jsx, root stack in app/\_layout.tsx).
-- UI uses React Native Paper + a shared theme (src/theme/index.js). Most screens wrap content in the shared Screen component for safe area + keyboard-aware scrolling (src/components/Screen.jsx).
-- Data layer is WatermelonDB with SQLite adapter (src/database/index.js, src/database/schema.js). Models and relationships are in src/models/\*.js.
-- Business logic is in service modules under src/services/\* and operates on WatermelonDB models within database.write transactions.
+- Expo Router file-based navigation lives under app/ (root stack in app/\_layout.tsx, tabs in app/(tabs)/\_layout.jsx).
+- Root layout wires providers: LanguageProvider, SafeAreaProvider, and PaperProvider with the shared theme and Inter fonts (app/\_layout.tsx, src/theme/index.js, src/i18n/LanguageContext.js).
+- Data layer is WatermelonDB with SQLite adapter (src/database/index.js, src/database/schema.js); models are defined in src/models/\*.js and registered in src/models/index.js.
+- Business logic lives in service modules under src/services/\* and should run DB mutations inside database.write.
 
-## Data flows and domain rules (examples to follow)
+## Data flows and domain rules (follow these patterns)
 
-- Inventory uses FIFO batches: addStock creates product_batches and updates Product.stock; consumeStockFIFO must be called inside database.write (src/services/inventoryService.js).
-- Sales creation consumes stock via FIFO, creates sale_items with cost_price, and (if credit) applies initial payment using FIFO allocations (src/services/saleService.js, src/services/creditService.js).
-- Credit payments apply oldest unpaid sale items first (FIFO) via getUnpaidSaleItemsFIFO/payGenericFIFO (src/services/creditService.js).
-- Product stock is a cached field; update stock only via inventoryService (see updateProduct note in src/services/productService.js).
+- Inventory is FIFO by batches: addStock creates product_batches and updates Product.stock; consumeStockFIFO runs inside database.write (src/services/inventoryService.js).
+- Sale creation consumes FIFO stock, writes sale_items with cost_price, and for credit sales applies initial payment via FIFO allocation (src/services/saleService.js, src/services/creditService.js).
+- Credit payments apply oldest unpaid sale items first via getUnpaidSaleItemsFIFO/payGenericFIFO (src/services/creditService.js).
+- Product.stock is a cached field; update it only via inventoryService helpers (see updateProduct note in src/services/productService.js).
 
-## Project-specific UI conventions
+## UI and state conventions
 
-- Use the shared theme colors and React Native Paper components; most screens import theme from src/theme and wrap content in Screen.
-- Current tab screens in app/(tabs) use local mock data via useMemo; when wiring real data, replace with WatermelonDB queries/services rather than inline mock arrays.
+- Use React Native Paper components and the shared theme; screens typically wrap content in Screen for safe area + padding (src/components/Screen.jsx, src/theme/index.js).
+- Tab screens under app/(tabs) currently use local mock data; when wiring real data, replace with WatermelonDB queries/services rather than inline arrays.
+- i18n uses i18n-js with expo-localization; default locale is ti and fallback is enabled (src/i18n/index.js).
 
 ## Developer workflows
 
@@ -28,5 +29,5 @@
 
 ## External integrations
 
-- Expo Router for navigation (expo-router/entry in package.json).
-- WatermelonDB + SQLite adapter with jsi: false for Expo managed workflow (src/database/index.js).
+- Expo Router entrypoint is expo-router/entry in package.json.
+- WatermelonDB SQLite adapter uses jsi: false for Expo managed workflow (src/database/index.js).

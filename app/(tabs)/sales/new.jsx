@@ -15,6 +15,8 @@ import {
     TouchableRipple,
 } from "react-native-paper";
 import FormScreen from "../../../src/components/FormScreen";
+import i18n from "../../../src/i18n";
+import { useLanguage } from "../../../src/i18n/LanguageContext";
 import { getCustomersWithBalances } from "../../../src/services/creditService";
 import { createCustomer } from "../../../src/services/customerService";
 import { getProducts } from "../../../src/services/productService";
@@ -22,6 +24,11 @@ import { createSale } from "../../../src/services/saleService";
 import theme from "../../../src/theme";
 
 const NewSaleScreen = () => {
+    const { language } = useLanguage();
+    const currencyPrefix = useMemo(
+        () => i18n.t("common.currency.prefix"),
+        [language],
+    );
     const [query, setQuery] = useState("");
     const [paymentMethod, setPaymentMethod] = useState("cash");
     const [paidAmount, setPaidAmount] = useState("");
@@ -204,7 +211,7 @@ const NewSaleScreen = () => {
 
     const handleSubmitSale = async () => {
         if (cartItems.length === 0) {
-            setErrorMessage("Add at least one product.");
+            setErrorMessage(i18n.t("sales.errors.addProduct"));
             return;
         }
 
@@ -212,7 +219,7 @@ const NewSaleScreen = () => {
         const total = totals.total;
 
         if (paymentMethod === "credit" && !selectedCustomer) {
-            setErrorMessage("Customer is required for credit sales.");
+            setErrorMessage(i18n.t("sales.errors.customerRequired"));
             return;
         }
 
@@ -245,7 +252,7 @@ const NewSaleScreen = () => {
             router.back();
         } catch (error) {
             console.error("Failed to create sale", error);
-            setErrorMessage("Unable to complete sale.");
+            setErrorMessage(i18n.t("sales.errors.completeSale"));
         } finally {
             setSaving(false);
         }
@@ -255,7 +262,7 @@ const NewSaleScreen = () => {
         <>
             <Stack.Screen
                 options={{
-                    headerTitle: "New Sale",
+                    headerTitle: i18n.t("sales.new.title"),
                     headerTitleAlign: "center",
                     headerTitleStyle: {
                         fontWeight: "700",
@@ -270,7 +277,7 @@ const NewSaleScreen = () => {
                     onPress={() => setAddProductVisible(true)}
                     style={styles.addProductButton}
                 >
-                    Add Product
+                    {i18n.t("sales.new.addProduct")}
                 </Button>
 
                 <Portal>
@@ -281,7 +288,9 @@ const NewSaleScreen = () => {
                         contentContainerStyle={styles.modalContainer}
                     >
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Add Products</Text>
+                            <Text style={styles.modalTitle}>
+                                {i18n.t("sales.new.addProducts")}
+                            </Text>
                             <IconButton
                                 icon="close"
                                 size={20}
@@ -298,12 +307,12 @@ const NewSaleScreen = () => {
                                 <View style={styles.modalLoading}>
                                     <ActivityIndicator animating />
                                     <Text style={styles.modalEmpty}>
-                                        Loading products…
+                                        {i18n.t("sales.new.loadingProducts")}
                                     </Text>
                                 </View>
                             ) : filteredProducts.length === 0 ? (
                                 <Text style={styles.modalEmpty}>
-                                    No matches
+                                    {i18n.t("sales.new.noMatches")}
                                 </Text>
                             ) : (
                                 filteredProducts.map((product) => (
@@ -321,7 +330,7 @@ const NewSaleScreen = () => {
                                             </Text>
                                             <Text style={styles.modalPrice}>
                                                 {product.defaultSellingPrice.toLocaleString()}{" "}
-                                                ETB
+                                                {currencyPrefix}
                                             </Text>
                                         </View>
                                     </TouchableRipple>
@@ -331,12 +340,13 @@ const NewSaleScreen = () => {
                         {selectedProduct && (
                             <View style={styles.modalEditor}>
                                 <Text style={styles.modalSectionTitle}>
-                                    Selected: {selectedProduct.name}
+                                    {i18n.t("sales.new.selected")}{" "}
+                                    {selectedProduct.name}
                                 </Text>
                                 <View style={styles.modalFieldRow}>
                                     <TextInput
                                         mode="outlined"
-                                        label="Quantity"
+                                        label={i18n.t("common.labels.quantity")}
                                         value={addQty}
                                         onChangeText={(text) =>
                                             setAddQty(text.replace(/\D/g, ""))
@@ -346,7 +356,9 @@ const NewSaleScreen = () => {
                                     />
                                     <TextInput
                                         mode="outlined"
-                                        label="Selling Price"
+                                        label={i18n.t(
+                                            "common.labels.sellingPrice",
+                                        )}
                                         value={addPrice}
                                         onChangeText={(text) =>
                                             setAddPrice(
@@ -355,14 +367,18 @@ const NewSaleScreen = () => {
                                         }
                                         keyboardType="numeric"
                                         style={styles.modalField}
-                                        right={<TextInput.Affix text="ETB" />}
+                                        right={
+                                            <TextInput.Affix
+                                                text={currencyPrefix}
+                                            />
+                                        }
                                     />
                                 </View>
                                 <Button
                                     mode="contained"
                                     onPress={handleAddToCart}
                                 >
-                                    Add to Cart
+                                    {i18n.t("sales.new.addToCart")}
                                 </Button>
                             </View>
                         )}
@@ -374,7 +390,9 @@ const NewSaleScreen = () => {
                         contentContainerStyle={styles.modalContainer}
                     >
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Edit Item</Text>
+                            <Text style={styles.modalTitle}>
+                                {i18n.t("sales.details.editItem")}
+                            </Text>
                             <IconButton
                                 icon="close"
                                 size={20}
@@ -389,7 +407,7 @@ const NewSaleScreen = () => {
                                 <View style={styles.modalFieldRow}>
                                     <TextInput
                                         mode="outlined"
-                                        label="Quantity"
+                                        label={i18n.t("common.labels.quantity")}
                                         value={editQty}
                                         onChangeText={(text) =>
                                             setEditQty(text.replace(/\D/g, ""))
@@ -399,7 +417,9 @@ const NewSaleScreen = () => {
                                     />
                                     <TextInput
                                         mode="outlined"
-                                        label="Selling Price"
+                                        label={i18n.t(
+                                            "common.labels.sellingPrice",
+                                        )}
                                         value={editPrice}
                                         onChangeText={(text) =>
                                             setEditPrice(
@@ -408,14 +428,18 @@ const NewSaleScreen = () => {
                                         }
                                         keyboardType="numeric"
                                         style={styles.modalField}
-                                        right={<TextInput.Affix text="ETB" />}
+                                        right={
+                                            <TextInput.Affix
+                                                text={currencyPrefix}
+                                            />
+                                        }
                                     />
                                 </View>
                                 <Button
                                     mode="contained"
                                     onPress={handleSaveEdit}
                                 >
-                                    Save Changes
+                                    {i18n.t("sales.new.saveChanges")}
                                 </Button>
                             </View>
                         )}
@@ -423,9 +447,13 @@ const NewSaleScreen = () => {
                 </Portal>
 
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionLabel}>Cart Items</Text>
+                    <Text style={styles.sectionLabel}>
+                        {i18n.t("sales.new.cartItems")}
+                    </Text>
                     <Text style={styles.sectionMeta}>
-                        {cartItems.length} Products
+                        {i18n.t("sales.new.productsCount", {
+                            count: cartItems.length,
+                        })}
                     </Text>
                 </View>
 
@@ -445,12 +473,14 @@ const NewSaleScreen = () => {
                                         {item.name}
                                     </Text>
                                     <Text style={styles.itemMeta}>
-                                        {item.price.toLocaleString()} ETB
+                                        {item.price.toLocaleString()}{" "}
+                                        {currencyPrefix}
                                     </Text>
                                 </View>
                                 <View style={styles.qtyPill}>
                                     <Text style={styles.qtyPillText}>
-                                        {item.qty} Units
+                                        {item.qty}{" "}
+                                        {i18n.t("common.labels.units")}
                                     </Text>
                                 </View>
                                 <IconButton
@@ -475,14 +505,16 @@ const NewSaleScreen = () => {
                 </Card>
 
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionLabel}>Customer</Text>
+                    <Text style={styles.sectionLabel}>
+                        {i18n.t("sales.new.customer")}
+                    </Text>
                     <Button
                         mode="text"
                         onPress={() => setCustomerModalVisible(true)}
                         labelStyle={styles.linkButton}
                         compact
                     >
-                        Select
+                        {i18n.t("common.actions.select")}
                     </Button>
                 </View>
                 <Card style={styles.card}>
@@ -495,11 +527,11 @@ const NewSaleScreen = () => {
                                 <View style={{ flex: 1 }}>
                                     <Text style={styles.itemName}>
                                         {selectedCustomer?.name ??
-                                            "Select customer"}
+                                            i18n.t("sales.new.selectCustomer")}
                                     </Text>
                                     <Text style={styles.itemMeta}>
                                         {selectedCustomer?.phone ??
-                                            "Customer phone"}
+                                            i18n.t("sales.new.customerPhone")}
                                     </Text>
                                 </View>
                                 <IconButton
@@ -519,7 +551,7 @@ const NewSaleScreen = () => {
                                     color={theme.colors.warning}
                                 />
                                 <Text style={styles.alertText}>
-                                    Customer is required for credit sales.
+                                    {i18n.t("sales.errors.customerRequired")}
                                 </Text>
                             </View>
                         )}
@@ -531,9 +563,9 @@ const NewSaleScreen = () => {
                                     color={theme.colors.warning}
                                 />
                                 <Text style={styles.alertText}>
-                                    Outstanding Balance:{" "}
+                                    {i18n.t("sales.new.outstandingBalance")}{" "}
                                     {selectedCustomer.balance.toLocaleString()}{" "}
-                                    ETB
+                                    {currencyPrefix}
                                 </Text>
                             </View>
                         )}
@@ -541,7 +573,9 @@ const NewSaleScreen = () => {
                 </Card>
 
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionLabel}>Payment Method</Text>
+                    <Text style={styles.sectionLabel}>
+                        {i18n.t("sales.new.paymentMethod")}
+                    </Text>
                 </View>
                 <Card style={styles.card}>
                     <Card.Content style={{ gap: 12 }}>
@@ -568,7 +602,7 @@ const NewSaleScreen = () => {
                                             : theme.colors.text,
                                 }}
                             >
-                                Cash
+                                {i18n.t("common.status.cash")}
                             </Chip>
                             <Chip
                                 icon="credit-card"
@@ -592,13 +626,13 @@ const NewSaleScreen = () => {
                                             : theme.colors.text,
                                 }}
                             >
-                                Credit
+                                {i18n.t("common.status.credit")}
                             </Chip>
                         </View>
 
                         <View>
                             <Text style={styles.sectionLabel}>
-                                Paid Amount (ETB)
+                                {i18n.t("sales.new.paidAmount")}
                             </Text>
                             <TextInput
                                 mode="outlined"
@@ -608,10 +642,13 @@ const NewSaleScreen = () => {
                                 outlineColor="#E5E7EB"
                                 activeOutlineColor={theme.colors.primary}
                                 style={styles.input}
-                                right={<TextInput.Affix text="ETB" />}
+                                right={
+                                    <TextInput.Affix text={currencyPrefix} />
+                                }
                             />
                             <Text style={styles.helperText}>
-                                Subtotal: {totals.total.toLocaleString()} ETB
+                                {i18n.t("common.labels.subtotal")}:{" "}
+                                {totals.total.toLocaleString()} {currencyPrefix}
                             </Text>
                         </View>
                     </Card.Content>
@@ -621,16 +658,18 @@ const NewSaleScreen = () => {
                     <Card.Content style={styles.summaryRow}>
                         <View>
                             <Text style={styles.sectionLabel}>
-                                Total Payable
+                                {i18n.t("common.labels.totalPayable")}
                             </Text>
                             <Text style={styles.totalValue}>
-                                {totals.total.toLocaleString()} ETB
+                                {totals.total.toLocaleString()} {currencyPrefix}
                             </Text>
                         </View>
                         <View style={{ alignItems: "flex-end" }}>
-                            <Text style={styles.sectionLabel}>Items Count</Text>
+                            <Text style={styles.sectionLabel}>
+                                {i18n.t("common.labels.itemsCount")}
+                            </Text>
                             <Text style={styles.itemsValue}>
-                                {totals.items} Units
+                                {totals.items} {i18n.t("common.labels.units")}
                             </Text>
                         </View>
                     </Card.Content>
@@ -645,7 +684,7 @@ const NewSaleScreen = () => {
                     loading={saving}
                     disabled={saving}
                 >
-                    Complete Sale
+                    {i18n.t("sales.new.completeSale")}
                 </Button>
                 {!!errorMessage && (
                     <Text style={styles.errorText}>{errorMessage}</Text>
@@ -665,7 +704,7 @@ const NewSaleScreen = () => {
                     >
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>
-                                Select Customer
+                                {i18n.t("sales.details.selectCustomerTitle")}
                             </Text>
                             <IconButton
                                 icon="close"
@@ -677,7 +716,9 @@ const NewSaleScreen = () => {
                             mode="outlined"
                             value={customerQuery}
                             onChangeText={setCustomerQuery}
-                            placeholder="Search customers..."
+                            placeholder={i18n.t(
+                                "sales.details.searchCustomersPlaceholder",
+                            )}
                             outlineColor="#E5E7EB"
                             activeOutlineColor={theme.colors.primary}
                             style={styles.search}
@@ -688,12 +729,12 @@ const NewSaleScreen = () => {
                                 <View style={styles.modalLoading}>
                                     <ActivityIndicator animating />
                                     <Text style={styles.modalEmpty}>
-                                        Loading customers…
+                                        {i18n.t("sales.new.loadingCustomers")}
                                     </Text>
                                 </View>
                             ) : filteredCustomers.length === 0 ? (
                                 <Text style={styles.modalEmpty}>
-                                    No customers found
+                                    {i18n.t("sales.new.noCustomersFound")}
                                 </Text>
                             ) : (
                                 filteredCustomers.map((customer) => (
@@ -721,7 +762,7 @@ const NewSaleScreen = () => {
                                                 </Text>
                                             </View>
                                             <Text style={styles.modalPrice}>
-                                                ETB{" "}
+                                                {currencyPrefix}{" "}
                                                 {customer.balance.toLocaleString()}
                                             </Text>
                                         </View>
@@ -737,23 +778,25 @@ const NewSaleScreen = () => {
                             }
                             style={styles.addCustomerButton}
                         >
-                            {addCustomerVisible ? "Close" : "Add New Customer"}
+                            {addCustomerVisible
+                                ? i18n.t("sales.new.close")
+                                : i18n.t("sales.new.addNewCustomer")}
                         </Button>
                         {addCustomerVisible && (
                             <View style={styles.modalEditor}>
                                 <Text style={styles.modalSectionTitle}>
-                                    New Customer
+                                    {i18n.t("sales.new.newCustomer")}
                                 </Text>
                                 <TextInput
                                     mode="outlined"
-                                    label="Full Name"
+                                    label={i18n.t("common.labels.name")}
                                     value={newCustomerName}
                                     onChangeText={setNewCustomerName}
                                     style={styles.modalField}
                                 />
                                 <TextInput
                                     mode="outlined"
-                                    label="Phone"
+                                    label={i18n.t("common.labels.phone")}
                                     value={newCustomerPhone}
                                     onChangeText={setNewCustomerPhone}
                                     keyboardType="phone-pad"
@@ -763,7 +806,7 @@ const NewSaleScreen = () => {
                                     mode="contained"
                                     onPress={handleAddCustomer}
                                 >
-                                    Save Customer
+                                    {i18n.t("sales.details.saveCustomer")}
                                 </Button>
                             </View>
                         )}
@@ -790,7 +833,7 @@ const SearchBar = ({
         onBlur={onBlur}
         editable={!readOnly}
         autoFocus={autoFocus}
-        placeholder="Search products to add..."
+        placeholder={i18n.t("sales.new.searchProductsPlaceholder")}
         outlineColor="#E5E7EB"
         activeOutlineColor={theme.colors.primary}
         style={styles.search}

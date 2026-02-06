@@ -1,5 +1,6 @@
 import { StyleSheet, View } from "react-native";
 import { Card, Icon, Text } from "react-native-paper";
+import i18n from "../i18n";
 import theme from "../theme";
 
 const RecentSaleItem = ({ customerName, amount, time, type }) => {
@@ -9,14 +10,14 @@ const RecentSaleItem = ({ customerName, amount, time, type }) => {
                   icon: "account",
                   bg: "#E0EAFF",
                   iconColor: theme.colors.primary,
-                  label: "Credit Sale",
+                  label: i18n.t("home.sales.creditLabel"),
                   dot: "#F59E0B",
               }
             : {
                   icon: "cash",
                   bg: "#E7F5ED",
                   iconColor: theme.colors.secondary,
-                  label: "Cash Sale",
+                  label: i18n.t("home.sales.cashLabel"),
                   dot: null,
               };
 
@@ -44,7 +45,8 @@ const RecentSaleItem = ({ customerName, amount, time, type }) => {
                 </View>
                 <View style={styles.right}>
                     <Text style={styles.amount}>
-                        ETB {amount.toLocaleString()}
+                        {i18n.t("home.stats.currencyPrefix")}{" "}
+                        {amount.toLocaleString()}
                     </Text>
                     <Text style={styles.time}>{time}</Text>
                 </View>

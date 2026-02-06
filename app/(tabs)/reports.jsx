@@ -14,15 +14,31 @@ import {
     TextInput,
 } from "react-native-paper";
 import Screen from "../../src/components/Screen";
+import database from "../../src/database";
+import i18n from "../../src/i18n";
+import { useLanguage } from "../../src/i18n/LanguageContext";
 import { getSalesReportByDateRange } from "../../src/services/reportingService";
 import theme from "../../src/theme";
 
 const ReportsScreen = () => {
+    const { language } = useLanguage();
+    const locale = language === "ti" ? "ti-ET" : "en";
+    const formatDate = (date) => date.toLocaleDateString(locale);
+    const formatDateInput = (date) => date.toISOString().slice(0, 10);
+    const parseInputDate = (value) => {
+        const parsed = Date.parse(value);
+        return Number.isNaN(parsed) ? null : new Date(parsed);
+    };
+
     const [range, setRange] = useState("month");
     const [filter, setFilter] = useState("all");
     const [calendarOpen, setCalendarOpen] = useState(false);
-    const [fromDate, setFromDate] = useState("Jan 01, 2026");
-    const [toDate, setToDate] = useState("Feb 03, 2026");
+    const [fromDate, setFromDate] = useState(() => {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        return formatDateInput(start);
+    });
+    const [toDate, setToDate] = useState(() => formatDateInput(new Date()));
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [report, setReport] = useState({
@@ -33,12 +49,19 @@ const ReportsScreen = () => {
     });
 
     const rangeLabel = useMemo(() => {
-        if (range === "today") return "Today";
-        if (range === "week") return "This Week";
-        if (range === "month") return "This Month";
-        if (range === "custom") return `${fromDate} – ${toDate}`;
-        return "This Month";
-    }, [range, fromDate, toDate]);
+        if (range === "today") return i18n.t("reports.range.today");
+        if (range === "week") return i18n.t("reports.range.week");
+        if (range === "month") return i18n.t("reports.range.month");
+        if (range === "custom") {
+            const parsedStart = parseInputDate(fromDate);
+            const parsedEnd = parseInputDate(toDate);
+            if (parsedStart && parsedEnd) {
+                return `${formatDate(parsedStart)} – ${formatDate(parsedEnd)}`;
+            }
+            return i18n.t("reports.range.custom");
+        }
+        return i18n.t("reports.range.month");
+    }, [range, fromDate, toDate, language]);
 
     const getRangeDates = () => {
         const now = new Date();
@@ -57,13 +80,9 @@ const ReportsScreen = () => {
             return { start, end };
         }
         if (range === "custom") {
-            const parsedStart = Date.parse(fromDate);
-            const parsedEnd = Date.parse(toDate);
-            if (
-                !Number.isNaN(parsedStart) &&
-                !Number.isNaN(parsedEnd) &&
-                parsedStart <= parsedEnd
-            ) {
+            const parsedStart = parseInputDate(fromDate);
+            const parsedEnd = parseInputDate(toDate);
+            if (parsedStart && parsedEnd && parsedStart <= parsedEnd) {
                 const start = new Date(parsedStart);
                 const customEnd = new Date(parsedEnd);
                 customEnd.setHours(23, 59, 59, 999);
@@ -79,13 +98,9 @@ const ReportsScreen = () => {
 
     const customRangeInvalid = useMemo(() => {
         if (range !== "custom") return false;
-        const parsedStart = Date.parse(fromDate);
-        const parsedEnd = Date.parse(toDate);
-        return (
-            Number.isNaN(parsedStart) ||
-            Number.isNaN(parsedEnd) ||
-            parsedStart > parsedEnd
-        );
+        const parsedStart = parseInputDate(fromDate);
+        const parsedEnd = parseInputDate(toDate);
+        return !parsedStart || !parsedEnd || parsedStart > parsedEnd;
     }, [range, fromDate, toDate]);
 
     const loadReport = useCallback(async () => {
@@ -101,7 +116,7 @@ const ReportsScreen = () => {
         } catch (error) {
             console.error("Failed to load report", error);
             setReport({ profit: 0, revenue: 0, cogs: 0, items: [] });
-            setError("Unable to load reports.");
+            setError(i18n.t("reports.errors.load"));
         } finally {
             setLoading(false);
         }
@@ -121,6 +136,19 @@ const ReportsScreen = () => {
             loadReport();
         }, [loadReport]),
     );
+
+    useEffect(() => {
+        const salesCollection = database.collections.get("sales");
+        const saleItemsCollection = database.collections.get("sale_items");
+        const subscriptions = [
+            salesCollection.query().observe(),
+            saleItemsCollection.query().observe(),
+        ].map((observable) => observable.subscribe(() => loadReport()));
+
+        return () => {
+            subscriptions.forEach((sub) => sub.unsubscribe());
+        };
+    }, [loadReport]);
 
     const filteredItems = useMemo(() => {
         return report.items.filter((item) => {
@@ -153,7 +181,9 @@ const ReportsScreen = () => {
                             />
                         </View>
                         <View>
-                            <Text style={styles.rangeLabel}>Time Period</Text>
+                            <Text style={styles.rangeLabel}>
+                                {i18n.t("reports.timePeriod")}
+                            </Text>
                             <Text style={styles.rangeValue}>{rangeLabel}</Text>
                         </View>
                     </View>
@@ -170,10 +200,11 @@ const ReportsScreen = () => {
                     <View style={styles.summaryTop}>
                         <View>
                             <Text style={styles.summaryLabel}>
-                                Total Net Profit
+                                {i18n.t("reports.summary.totalNetProfit")}
                             </Text>
                             <Text style={styles.summaryValue}>
-                                ETB {report.profit.toLocaleString()}
+                                {i18n.t("common.currency.prefix")}{" "}
+                                {report.profit.toLocaleString()}
                             </Text>
                         </View>
                         <Chip
@@ -193,10 +224,14 @@ const ReportsScreen = () => {
                     </View>
                     <View style={styles.summaryRow}>
                         <Text style={styles.summaryMeta}>
-                            REV: ETB {report.revenue.toLocaleString()}
+                            {i18n.t("reports.summary.revenueShort")}:{" "}
+                            {i18n.t("common.currency.prefix")}{" "}
+                            {report.revenue.toLocaleString()}
                         </Text>
                         <Text style={styles.summaryMeta}>
-                            COGS: ETB {report.cogs.toLocaleString()}
+                            {i18n.t("reports.summary.cogsShort")}:{" "}
+                            {i18n.t("common.currency.prefix")}{" "}
+                            {report.cogs.toLocaleString()}
                         </Text>
                     </View>
                 </Card.Content>
@@ -216,7 +251,7 @@ const ReportsScreen = () => {
                         filter === "all" && styles.filterChipActive,
                     ]}
                 >
-                    All
+                    {i18n.t("reports.filters.all")}
                 </Chip>
                 <Chip
                     selected={filter === "high"}
@@ -232,7 +267,7 @@ const ReportsScreen = () => {
                         filter === "high" && styles.filterChipActive,
                     ]}
                 >
-                    High Margin
+                    {i18n.t("reports.filters.highMargin")}
                 </Chip>
                 <Chip
                     selected={filter === "low"}
@@ -247,7 +282,7 @@ const ReportsScreen = () => {
                         filter === "low" && styles.filterChipActive,
                     ]}
                 >
-                    Low Stock
+                    {i18n.t("reports.filters.lowStock")}
                 </Chip>
             </View>
 
@@ -260,7 +295,7 @@ const ReportsScreen = () => {
                         <Card.Content style={{ gap: 10 }}>
                             <ActivityIndicator />
                             <Text style={styles.metricLabel}>
-                                Loading report...
+                                {i18n.t("reports.loading")}
                             </Text>
                         </Card.Content>
                     </Card>
@@ -269,7 +304,7 @@ const ReportsScreen = () => {
                     <Card style={styles.itemCard}>
                         <Card.Content>
                             <Text style={styles.metricLabel}>
-                                No sales in this period.
+                                {i18n.t("reports.empty")}
                             </Text>
                         </Card.Content>
                     </Card>
@@ -292,23 +327,33 @@ const ReportsScreen = () => {
                                     </View>
                                     <View style={styles.itemMetricsRow}>
                                         <Metric
-                                            label="Sold"
-                                            value={`${item.sold} units`}
+                                            label={i18n.t(
+                                                "reports.metrics.sold",
+                                            )}
+                                            value={`${item.sold} ${i18n.t("reports.metrics.units")}`}
                                         />
                                         <Metric
-                                            label="REV"
+                                            label={i18n.t(
+                                                "reports.summary.revenueShort",
+                                            )}
                                             value={`${item.revenue.toLocaleString()}`}
                                         />
                                         <Metric
-                                            label="COGS"
+                                            label={i18n.t(
+                                                "reports.summary.cogsShort",
+                                            )}
                                             value={`${item.cogs.toLocaleString()}`}
                                         />
                                     </View>
                                     <View style={styles.netRow}>
                                         <Text style={styles.netLabel}>
                                             {net >= 0
-                                                ? "Net Profit"
-                                                : "Net Loss"}
+                                                ? i18n.t(
+                                                      "reports.metrics.netProfit",
+                                                  )
+                                                : i18n.t(
+                                                      "reports.metrics.netLoss",
+                                                  )}
                                         </Text>
                                         <Text
                                             style={[
@@ -323,7 +368,8 @@ const ReportsScreen = () => {
                                                 },
                                             ]}
                                         >
-                                            ETB {Math.abs(net).toLocaleString()}
+                                            {i18n.t("common.currency.prefix")}{" "}
+                                            {Math.abs(net).toLocaleString()}
                                         </Text>
                                     </View>
                                 </Card.Content>
@@ -340,7 +386,9 @@ const ReportsScreen = () => {
                 >
                     <View style={styles.sheetHandle} />
                     <View style={styles.sheetHeader}>
-                        <Text style={styles.sheetTitle}>Select range</Text>
+                        <Text style={styles.sheetTitle}>
+                            {i18n.t("reports.selectRange")}
+                        </Text>
                         <IconButton
                             icon="close"
                             size={20}
@@ -365,7 +413,7 @@ const ReportsScreen = () => {
                                 range === "today" && styles.filterChipActive,
                             ]}
                         >
-                            Today
+                            {i18n.t("reports.range.today")}
                         </Chip>
                         <Chip
                             selected={range === "week"}
@@ -383,7 +431,7 @@ const ReportsScreen = () => {
                                 range === "week" && styles.filterChipActive,
                             ]}
                         >
-                            This Week
+                            {i18n.t("reports.range.week")}
                         </Chip>
                         <Chip
                             selected={range === "month"}
@@ -401,7 +449,7 @@ const ReportsScreen = () => {
                                 range === "month" && styles.filterChipActive,
                             ]}
                         >
-                            This Month
+                            {i18n.t("reports.range.month")}
                         </Chip>
                         <Chip
                             selected={range === "custom"}
@@ -419,13 +467,15 @@ const ReportsScreen = () => {
                                 range === "custom" && styles.filterChipActive,
                             ]}
                         >
-                            Custom
+                            {i18n.t("reports.range.custom")}
                         </Chip>
                     </View>
 
                     <View style={styles.dateGrid}>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.inputLabel}>From</Text>
+                            <Text style={styles.inputLabel}>
+                                {i18n.t("reports.from")}
+                            </Text>
                             <TextInput
                                 mode="outlined"
                                 value={fromDate}
@@ -438,7 +488,9 @@ const ReportsScreen = () => {
                             />
                         </View>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.inputLabel}>To</Text>
+                            <Text style={styles.inputLabel}>
+                                {i18n.t("reports.to")}
+                            </Text>
                             <TextInput
                                 mode="outlined"
                                 value={toDate}
@@ -458,7 +510,7 @@ const ReportsScreen = () => {
                             style={{ flex: 1 }}
                             onPress={() => setCalendarOpen(false)}
                         >
-                            Cancel
+                            {i18n.t("common.actions.cancel")}
                         </Button>
                         <Button
                             mode="contained"
@@ -469,12 +521,12 @@ const ReportsScreen = () => {
                             }}
                             disabled={customRangeInvalid}
                         >
-                            Apply
+                            {i18n.t("common.actions.apply")}
                         </Button>
                     </View>
                     {customRangeInvalid && (
                         <Text style={styles.errorText}>
-                            Enter a valid custom date range.
+                            {i18n.t("reports.errors.invalidRange")}
                         </Text>
                     )}
                 </Modal>
