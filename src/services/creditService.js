@@ -84,9 +84,9 @@ const getSaleItemRemainingBalance = async (saleItem) => {
     return total - paid;
 };
 
-const getSalePaymentSummary = async (sale) => {
+const getSalePaymentSummary = async (sale, saleItemsOverride = null) => {
     const soldAt = sale?.soldAt || null;
-    const items = await sale.saleItems.fetch();
+    const items = saleItemsOverride || (await sale.saleItems.fetch());
 
     let total = 0;
     let totalPaid = 0;

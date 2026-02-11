@@ -9,8 +9,6 @@ import {
     Chip,
     Icon,
     IconButton,
-    Modal,
-    Portal,
     Text,
     TextInput,
 } from "react-native-paper";
@@ -25,10 +23,13 @@ import {
     payTowardSaleItems,
 } from "../../../src/services/creditService";
 import theme from "../../../src/theme";
+import {
+    formatEthiopianDate,
+    formatEthiopianDateTime,
+} from "../../../src/utils/ethiopianCalendar";
 
 const MakePaymentScreen = () => {
     const { language } = useLanguage();
-    const locale = language === "ti" ? "ti-ET" : "en";
     const currencyPrefix = i18n.t("common.currency.prefix");
     const { id } = useLocalSearchParams();
     const [customer, setCustomer] = useState(null);
@@ -43,6 +44,17 @@ const MakePaymentScreen = () => {
     const [lastPaidAmount, setLastPaidAmount] = useState(0);
     const [lastReceiptNo, setLastReceiptNo] = useState("");
     const isMounted = useRef(true);
+    const handleDismissSuccess = () => setShowSuccess(false);
+    const handleDone = () => {
+        if (typeof id === "string") {
+            router.replace({
+                pathname: "/(tabs)/credits/details",
+                params: { id },
+            });
+            return;
+        }
+        router.back();
+    };
 
     const loadCustomer = useCallback(async () => {
         if (typeof id !== "string") return;
@@ -54,13 +66,14 @@ const MakePaymentScreen = () => {
             const enriched = await Promise.all(
                 unpaid.map(async (entry) => {
                     const product = await entry.saleItem.product.fetch();
+                    const soldAtTimestamp = entry.sale?.soldAt
+                        ? new Date(entry.sale.soldAt).getTime()
+                        : null;
                     return {
                         id: entry.saleItem.id,
                         title: product?.name || i18n.t("common.labels.item"),
-                        date: entry.sale?.soldAt
-                            ? new Date(entry.sale.soldAt).toLocaleDateString(
-                                  locale,
-                              )
+                        date: soldAtTimestamp
+                            ? formatEthiopianDate(soldAtTimestamp)
                             : "",
                         amount: entry.remainingBalance,
                         saleItem: entry.saleItem,
@@ -79,6 +92,19 @@ const MakePaymentScreen = () => {
             if (isMounted.current) setLoading(false);
         }
     }, [id, language]);
+
+    const periodLabels = useMemo(
+        () => ({
+            day: i18n.t("common.timePeriods.day"),
+            night: i18n.t("common.timePeriods.night"),
+        }),
+        [language],
+    );
+
+    const receiptDateLabel = useMemo(
+        () => formatEthiopianDateTime(Date.now(), periodLabels),
+        [periodLabels],
+    );
 
     useEffect(() => {
         isMounted.current = true;
@@ -219,7 +245,7 @@ const MakePaymentScreen = () => {
 
     if (loading || !customer) {
         return (
-            <Screen contentContainerStyle={styles.container}>
+            <Screen style={styles.container}>
                 <View style={styles.headerRow}>
                     <IconButton
                         icon="arrow-left"
@@ -241,6 +267,90 @@ const MakePaymentScreen = () => {
                         {loading && <ActivityIndicator />}
                     </Card.Content>
                 </Card>
+            </Screen>
+        );
+    }
+
+    if (showSuccess) {
+        return (
+            <Screen style={styles.successScreen}>
+                <Pressable
+                    style={styles.successContent}
+                    onPress={handleDismissSuccess}
+                >
+                    <View style={styles.successHeader}>
+                        <View style={styles.checkWrap}>
+                            <Icon source="check" size={20} color="#FFFFFF" />
+                        </View>
+                        <View>
+                            <Text style={styles.successTitle}>
+                                {i18n.t("credits.payment.successTitle")}
+                            </Text>
+                            <Text style={styles.successSubtitle}>
+                                {i18n.t("credits.payment.successSubtitle")}
+                            </Text>
+                        </View>
+                    </View>
+
+                    <Card style={styles.receiptCard}>
+                        <Card.Content style={{ gap: 12 }}>
+                            <View style={styles.amountBlock}>
+                                <Text style={styles.amountLabel}>
+                                    {i18n.t("common.labels.amountPaid")}
+                                </Text>
+                                <Text style={styles.amountValue}>
+                                    {currencyPrefix}{" "}
+                                    {lastPaidAmount.toLocaleString()}
+                                </Text>
+                            </View>
+                            <View style={styles.rowBetween}>
+                                <Text style={styles.meta}>
+                                    {i18n.t("common.labels.receiptNo")}
+                                </Text>
+                                <Text style={styles.metaStrong}>
+                                    {lastReceiptNo || "-"}
+                                </Text>
+                            </View>
+                            <View style={styles.rowBetween}>
+                                <Text style={styles.meta}>
+                                    {i18n.t("common.labels.customer")}
+                                </Text>
+                                <Text style={styles.metaStrong}>
+                                    {customer?.name ??
+                                        i18n.t("common.labels.customer")}
+                                </Text>
+                            </View>
+                            <View style={styles.rowBetween}>
+                                <Text style={styles.meta}>
+                                    {i18n.t("common.labels.date")}
+                                </Text>
+                                <Text style={styles.metaStrong}>
+                                    {receiptDateLabel}
+                                </Text>
+                            </View>
+                            <View style={styles.rowBetween}>
+                                <Text style={styles.meta}>
+                                    {i18n.t("common.labels.remainingBalance")}
+                                </Text>
+                                <Text style={styles.metaStrong}>
+                                    {currencyPrefix}{" "}
+                                    {Math.max(
+                                        totalOutstanding - lastPaidAmount,
+                                        0,
+                                    ).toLocaleString()}
+                                </Text>
+                            </View>
+                        </Card.Content>
+                    </Card>
+
+                    <Button
+                        mode="contained"
+                        onPress={handleDone}
+                        style={styles.doneButton}
+                    >
+                        {i18n.t("common.actions.done")}
+                    </Button>
+                </Pressable>
             </Screen>
         );
     }
@@ -393,88 +503,6 @@ const MakePaymentScreen = () => {
             >
                 {i18n.t("credits.actions.confirmPayment")}
             </Button>
-
-            <Portal>
-                <Modal
-                    visible={showSuccess}
-                    onDismiss={() => setShowSuccess(false)}
-                    contentContainerStyle={styles.successSheet}
-                >
-                    <View style={styles.sheetHandle} />
-                    <View style={styles.successHeader}>
-                        <View style={styles.checkWrap}>
-                            <Icon source="check" size={20} color="#FFFFFF" />
-                        </View>
-                        <View>
-                            <Text style={styles.successTitle}>
-                                {i18n.t("credits.payment.successTitle")}
-                            </Text>
-                            <Text style={styles.successSubtitle}>
-                                {i18n.t("credits.payment.successSubtitle")}
-                            </Text>
-                        </View>
-                    </View>
-
-                    <Card style={styles.receiptCard}>
-                        <Card.Content style={{ gap: 12 }}>
-                            <View style={styles.amountBlock}>
-                                <Text style={styles.amountLabel}>
-                                    {i18n.t("common.labels.amountPaid")}
-                                </Text>
-                                <Text style={styles.amountValue}>
-                                    {currencyPrefix}{" "}
-                                    {lastPaidAmount.toLocaleString()}
-                                </Text>
-                            </View>
-                            <View style={styles.rowBetween}>
-                                <Text style={styles.meta}>
-                                    {i18n.t("common.labels.receiptNo")}
-                                </Text>
-                                <Text style={styles.metaStrong}>
-                                    {lastReceiptNo || "-"}
-                                </Text>
-                            </View>
-                            <View style={styles.rowBetween}>
-                                <Text style={styles.meta}>
-                                    {i18n.t("common.labels.customer")}
-                                </Text>
-                                <Text style={styles.metaStrong}>
-                                    {customer?.name ??
-                                        i18n.t("common.labels.customer")}
-                                </Text>
-                            </View>
-                            <View style={styles.rowBetween}>
-                                <Text style={styles.meta}>
-                                    {i18n.t("common.labels.date")}
-                                </Text>
-                                <Text style={styles.metaStrong}>
-                                    {new Date().toLocaleString(locale)}
-                                </Text>
-                            </View>
-                            <View style={styles.rowBetween}>
-                                <Text style={styles.meta}>
-                                    {i18n.t("common.labels.remainingBalance")}
-                                </Text>
-                                <Text style={styles.metaStrong}>
-                                    {currencyPrefix}{" "}
-                                    {Math.max(
-                                        totalOutstanding - lastPaidAmount,
-                                        0,
-                                    ).toLocaleString()}
-                                </Text>
-                            </View>
-                        </Card.Content>
-                    </Card>
-
-                    <Button
-                        mode="contained"
-                        onPress={() => setShowSuccess(false)}
-                        style={styles.doneButton}
-                    >
-                        {i18n.t("common.actions.done")}
-                    </Button>
-                </Modal>
-            </Portal>
         </Screen>
     );
 };
@@ -616,20 +644,14 @@ const styles = StyleSheet.create({
     confirmContent: {
         paddingVertical: 6,
     },
-    successSheet: {
+    successScreen: {
+        flex: 1,
         backgroundColor: "#FFFFFF",
-        padding: 16,
-        borderTopLeftRadius: 22,
-        borderTopRightRadius: 22,
-        marginTop: "auto",
-        gap: 16,
+        paddingVertical: 16,
     },
-    sheetHandle: {
-        width: 48,
-        height: 5,
-        borderRadius: 999,
-        backgroundColor: "#E5E7EB",
-        alignSelf: "center",
+    successContent: {
+        flex: 1,
+        gap: 16,
     },
     successHeader: {
         flexDirection: "row",
@@ -681,6 +703,7 @@ const styles = StyleSheet.create({
         fontWeight: "600",
     },
     doneButton: {
+        marginTop: "auto",
         borderRadius: 16,
     },
 });

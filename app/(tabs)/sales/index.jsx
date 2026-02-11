@@ -17,20 +17,29 @@ import { useLanguage } from "../../../src/i18n/LanguageContext";
 import { getSalePaymentSummary } from "../../../src/services/creditService";
 import { getSales } from "../../../src/services/saleService";
 import theme from "../../../src/theme";
+import {
+    formatEthiopianDate,
+    formatEthiopianTime,
+} from "../../../src/utils/ethiopianCalendar";
 
 const SalesScreen = () => {
     const { language } = useLanguage();
-    const locale = language === "ti" ? "ti-ET" : "en";
-    const currencyPrefix = useMemo(
-        () => i18n.t("common.currency.prefix"),
-        [language],
-    );
+    const currencyPrefix = useMemo(() => i18n.t("common.currency.prefix"), []);
     const [filter, setFilter] = useState("all");
     const [query, setQuery] = useState("");
+    const [debouncedQuery, setDebouncedQuery] = useState("");
 
     const [sections, setSections] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+
+    useEffect(() => {
+        const handle = setTimeout(() => {
+            setDebouncedQuery(query);
+        }, 300);
+
+        return () => clearTimeout(handle);
+    }, [query]);
 
     const loadSales = useCallback(async () => {
         setLoading(true);
@@ -38,7 +47,10 @@ const SalesScreen = () => {
             setError("");
             const typeFilter =
                 filter === "cash" || filter === "credit" ? filter : "all";
-            const sales = await getSales({ search: query, type: typeFilter });
+            const sales = await getSales({
+                search: debouncedQuery,
+                type: typeFilter,
+            });
 
             const items = await Promise.all(
                 sales.map(async (sale) => {
@@ -60,16 +72,19 @@ const SalesScreen = () => {
                     const soldAt = sale.soldAt
                         ? new Date(sale.soldAt)
                         : new Date();
-                    const dateLabel = soldAt.toLocaleDateString(locale);
-                    const timeLabel = soldAt.toLocaleTimeString(locale, {
-                        hour: "2-digit",
-                        minute: "2-digit",
+                    const dateLabel = formatEthiopianDate(soldAt.getTime());
+                    const timeLabel = formatEthiopianTime(soldAt.getTime(), {
+                        day: i18n.t("common.timePeriods.day"),
+                        night: i18n.t("common.timePeriods.night"),
                     });
                     let status = "paid";
                     let tag = i18n.t("sales.tags.paid");
 
                     if (sale.type === "credit") {
-                        const summary = await getSalePaymentSummary(sale);
+                        const summary = await getSalePaymentSummary(
+                            sale,
+                            saleItems,
+                        );
                         if (summary.remainingBalance > 0) {
                             status =
                                 summary.initialPaid > 0 ? "partial" : "credit";
@@ -126,7 +141,7 @@ const SalesScreen = () => {
         } finally {
             setLoading(false);
         }
-    }, [filter, query]);
+    }, [debouncedQuery, filter]);
 
     useEffect(() => {
         loadSales();
@@ -265,7 +280,7 @@ const SalesScreen = () => {
                     </Chip>
                 </View>
 
-                <ScrollView>
+                <ScrollView showsVerticalScrollIndicator={false}>
                     {!!error && (
                         <View style={styles.errorBanner}>
                             <Text style={styles.errorText}>{error}</Text>
@@ -422,7 +437,7 @@ const getStatusTone = (status) => {
 const styles = StyleSheet.create({
     container: {
         gap: 14,
-        paddingBottom: 32,
+        // paddingBottom: 32,
     },
     headerRow: {
         flexDirection: "row",

@@ -141,7 +141,6 @@ const getSales = async ({ search = "", ...options } = {}) => {
     const filtered = [];
     for (const sale of sales) {
         if (!sale.customerId) {
-            filtered.push(sale);
             continue;
         }
         const customer = await sale.customer.fetch();

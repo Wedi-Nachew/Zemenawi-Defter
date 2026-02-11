@@ -14,6 +14,8 @@ import {
     TextInput,
     TouchableRipple,
 } from "react-native-paper";
+import EthiopianDatePicker from "../../../src/components/EthiopianDatePicker";
+import EthiopianTimePicker from "../../../src/components/EthiopianTimePicker";
 import FormScreen from "../../../src/components/FormScreen";
 import i18n from "../../../src/i18n";
 import { useLanguage } from "../../../src/i18n/LanguageContext";
@@ -22,6 +24,12 @@ import { createCustomer } from "../../../src/services/customerService";
 import { getProducts } from "../../../src/services/productService";
 import { createSale } from "../../../src/services/saleService";
 import theme from "../../../src/theme";
+import {
+    ethiopianDateTimeToTimestamp,
+    formatEthiopianDate,
+    formatEthiopianTime,
+    timestampToEthiopianParts,
+} from "../../../src/utils/ethiopianCalendar";
 
 const NewSaleScreen = () => {
     const { language } = useLanguage();
@@ -48,6 +56,9 @@ const NewSaleScreen = () => {
     const [editItem, setEditItem] = useState(null);
     const [editQty, setEditQty] = useState("1");
     const [editPrice, setEditPrice] = useState("");
+    const [saleTimestamp, setSaleTimestamp] = useState(() => Date.now());
+    const [datePickerOpen, setDatePickerOpen] = useState(false);
+    const [timePickerOpen, setTimePickerOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
@@ -245,7 +256,7 @@ const NewSaleScreen = () => {
                 selectedCustomer?.model || null,
                 saleType,
                 items,
-                Date.now(),
+                saleTimestamp,
                 initialPayment,
             );
 
@@ -501,6 +512,35 @@ const NewSaleScreen = () => {
                                 />
                             </View>
                         ))}
+                    </Card.Content>
+                </Card>
+
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionLabel}>
+                        {i18n.t("sales.details.dateTime")}
+                    </Text>
+                </View>
+                <Card style={styles.card}>
+                    <Card.Content>
+                        <View style={styles.dateTimeRow}>
+                            <Button
+                                mode="outlined"
+                                onPress={() => setDatePickerOpen(true)}
+                                style={styles.dateTimeButton}
+                            >
+                                {formatEthiopianDate(saleTimestamp)}
+                            </Button>
+                            <Button
+                                mode="outlined"
+                                onPress={() => setTimePickerOpen(true)}
+                                style={styles.dateTimeButton}
+                            >
+                                {formatEthiopianTime(saleTimestamp, {
+                                    day: i18n.t("common.timePeriods.day"),
+                                    night: i18n.t("common.timePeriods.night"),
+                                })}
+                            </Button>
+                        </View>
                     </Card.Content>
                 </Card>
 
@@ -813,6 +853,44 @@ const NewSaleScreen = () => {
                     </ScrollView>
                 </Modal>
             </Portal>
+
+            <EthiopianDatePicker
+                visible={datePickerOpen}
+                value={saleTimestamp}
+                onDismiss={() => setDatePickerOpen(false)}
+                onConfirm={({ year, month, day }) => {
+                    const current = timestampToEthiopianParts(saleTimestamp);
+                    const timestamp = ethiopianDateTimeToTimestamp({
+                        year,
+                        month,
+                        day,
+                        hour: current.hour,
+                        minute: current.minute,
+                        period: current.period,
+                    });
+                    setSaleTimestamp(timestamp);
+                    setDatePickerOpen(false);
+                }}
+            />
+
+            <EthiopianTimePicker
+                visible={timePickerOpen}
+                value={saleTimestamp}
+                onDismiss={() => setTimePickerOpen(false)}
+                onConfirm={({ hour, minute, period }) => {
+                    const current = timestampToEthiopianParts(saleTimestamp);
+                    const timestamp = ethiopianDateTimeToTimestamp({
+                        year: current.year,
+                        month: current.month,
+                        day: current.day,
+                        hour,
+                        minute,
+                        period,
+                    });
+                    setSaleTimestamp(timestamp);
+                    setTimePickerOpen(false);
+                }}
+            />
         </>
     );
 };
@@ -991,6 +1069,14 @@ const styles = StyleSheet.create({
         elevation: 0,
         borderWidth: 1,
         borderColor: "#EEF0F4",
+    },
+    dateTimeRow: {
+        flexDirection: "row",
+        gap: 12,
+    },
+    dateTimeButton: {
+        flex: 1,
+        borderRadius: 12,
     },
     cartRow: {
         flexDirection: "row",

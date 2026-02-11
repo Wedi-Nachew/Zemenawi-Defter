@@ -16,6 +16,8 @@ import {
     TextInput,
     TouchableRipple,
 } from "react-native-paper";
+import EthiopianDatePicker from "../../../src/components/EthiopianDatePicker";
+import EthiopianTimePicker from "../../../src/components/EthiopianTimePicker";
 import Screen from "../../../src/components/Screen";
 import database from "../../../src/database";
 import i18n from "../../../src/i18n";
@@ -31,10 +33,16 @@ import {
     getSaleItems,
 } from "../../../src/services/saleService";
 import theme from "../../../src/theme";
+import {
+    ethiopianDateTimeToTimestamp,
+    formatEthiopianDate,
+    formatEthiopianDateTime,
+    formatEthiopianTime,
+    timestampToEthiopianParts,
+} from "../../../src/utils/ethiopianCalendar";
 
 const SaleDetailsScreen = () => {
     const { language } = useLanguage();
-    const locale = language === "ti" ? "ti-ET" : "en";
     const currencyPrefix = i18n.t("common.currency.prefix");
     const { id } = useLocalSearchParams();
     const [sale, setSale] = useState(null);
@@ -47,7 +55,7 @@ const SaleDetailsScreen = () => {
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
-    const [editSoldAt, setEditSoldAt] = useState("");
+    const [editSoldAt, setEditSoldAt] = useState(null);
     const [editError, setEditError] = useState("");
     const [editType, setEditType] = useState("cash");
     const [editCustomer, setEditCustomer] = useState(null);
@@ -60,6 +68,8 @@ const SaleDetailsScreen = () => {
     const [editItem, setEditItem] = useState(null);
     const [editQty, setEditQty] = useState("");
     const [editPrice, setEditPrice] = useState("");
+    const [editDatePickerOpen, setEditDatePickerOpen] = useState(false);
+    const [editTimePickerOpen, setEditTimePickerOpen] = useState(false);
     const [paymentSummary, setPaymentSummary] = useState({
         totalPaid: 0,
         initialPaid: 0,
@@ -254,10 +264,7 @@ const SaleDetailsScreen = () => {
     const status = getStatusTone(computedStatus);
 
     const openEdit = () => {
-        const soldAtValue = sale.soldAt
-            ? new Date(sale.soldAt).toISOString()
-            : "";
-        setEditSoldAt(soldAtValue);
+        setEditSoldAt(sale.soldAt || Date.now());
         setEditError("");
         setEditType(sale.type || "cash");
         setEditCustomer(
@@ -267,8 +274,7 @@ const SaleDetailsScreen = () => {
     };
 
     const handleEditSave = async () => {
-        const parsedDate = Date.parse(editSoldAt);
-        if (Number.isNaN(parsedDate)) {
+        if (!Number.isFinite(editSoldAt)) {
             setEditError(i18n.t("sales.errors.invalidDate"));
             return;
         }
@@ -282,7 +288,7 @@ const SaleDetailsScreen = () => {
         try {
             await database.write(async () => {
                 await sale.update((s) => {
-                    s.soldAt = parsedDate;
+                    s.soldAt = editSoldAt;
                     s.type = editType;
                     if (editType === "credit" && editCustomer?.model) {
                         s.customer.set(editCustomer.model);
@@ -406,14 +412,47 @@ const SaleDetailsScreen = () => {
                                     <Text style={styles.cardTitle}>
                                         {customerName}
                                     </Text>
-                                    <Text style={styles.meta}>
-                                        {sale.id.slice(0, 8).toUpperCase()} •{" "}
-                                        {sale.soldAt
-                                            ? new Date(
-                                                  sale.soldAt,
-                                              ).toLocaleString(locale)
-                                            : ""}
-                                    </Text>
+                                    <View style={styles.dateTimeRow}>
+                                        <Button
+                                            mode="outlined"
+                                            onPress={() =>
+                                                setEditDatePickerOpen(true)
+                                            }
+                                            style={styles.dateTimeButton}
+                                        >
+                                            {editSoldAt
+                                                ? formatEthiopianDate(
+                                                      editSoldAt,
+                                                  )
+                                                : i18n.t(
+                                                      "sales.errors.invalidDate",
+                                                  )}
+                                        </Button>
+                                        <Button
+                                            mode="outlined"
+                                            onPress={() =>
+                                                setEditTimePickerOpen(true)
+                                            }
+                                            style={styles.dateTimeButton}
+                                        >
+                                            {editSoldAt
+                                                ? formatEthiopianTime(
+                                                      editSoldAt,
+                                                      {
+                                                          day: i18n.t(
+                                                              "common.timePeriods.day",
+                                                          ),
+                                                          night: i18n.t(
+                                                              "common.timePeriods.night",
+                                                          ),
+                                                      },
+                                                  )
+                                                : i18n.t(
+                                                      "sales.errors.invalidDate",
+                                                  )}
+                                        </Button>
+                                    </View>
+                                    {/* </Text> */}
                                 </View>
                                 <View
                                     style={[
@@ -676,12 +715,19 @@ const SaleDetailsScreen = () => {
                             <Text style={styles.sectionTitle}>
                                 {i18n.t("sales.details.dateTime")}
                             </Text>
-                            <TextInput
+                            <Button
                                 mode="outlined"
-                                value={editSoldAt}
-                                onChangeText={setEditSoldAt}
-                                style={styles.dialogInput}
-                            />
+                                onPress={() => setEditDatePickerOpen(true)}
+                            >
+                                {editSoldAt
+                                    ? formatEthiopianDateTime(editSoldAt, {
+                                          day: i18n.t("common.timePeriods.day"),
+                                          night: i18n.t(
+                                              "common.timePeriods.night",
+                                          ),
+                                      })
+                                    : i18n.t("sales.errors.invalidDate")}
+                            </Button>
 
                             <Text style={styles.sectionTitle}>
                                 {i18n.t("sales.details.paymentType")}
@@ -916,6 +962,46 @@ const SaleDetailsScreen = () => {
                             </View>
                         </ScrollView>
                     </Modal>
+                    <EthiopianDatePicker
+                        visible={editDatePickerOpen}
+                        value={editSoldAt || Date.now()}
+                        onDismiss={() => setEditDatePickerOpen(false)}
+                        onConfirm={({ year, month, day }) => {
+                            const current = timestampToEthiopianParts(
+                                editSoldAt || Date.now(),
+                            );
+                            const timestamp = ethiopianDateTimeToTimestamp({
+                                year,
+                                month,
+                                day,
+                                hour: current.hour,
+                                minute: current.minute,
+                                period: current.period,
+                            });
+                            setEditSoldAt(timestamp);
+                            setEditDatePickerOpen(false);
+                        }}
+                    />
+                    <EthiopianTimePicker
+                        visible={editTimePickerOpen}
+                        value={editSoldAt || Date.now()}
+                        onDismiss={() => setEditTimePickerOpen(false)}
+                        onConfirm={({ hour, minute, period }) => {
+                            const current = timestampToEthiopianParts(
+                                editSoldAt || Date.now(),
+                            );
+                            const timestamp = ethiopianDateTimeToTimestamp({
+                                year: current.year,
+                                month: current.month,
+                                day: current.day,
+                                hour,
+                                minute,
+                                period,
+                            });
+                            setEditSoldAt(timestamp);
+                            setEditTimePickerOpen(false);
+                        }}
+                    />
                 </Portal>
             </Screen>
         </>
@@ -1130,6 +1216,14 @@ const styles = StyleSheet.create({
     editRow: {
         flexDirection: "row",
         gap: 10,
+    },
+    dateTimeRow: {
+        flexDirection: "row",
+        gap: 10,
+    },
+    dateTimeButton: {
+        flex: 1,
+        borderRadius: 12,
     },
     editField: {
         flex: 1,
