@@ -15,6 +15,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "react-native";
 import { PaperProvider } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { AuthProvider } from "../src/auth/AuthProvider";
 import { LanguageProvider, useLanguage } from "../src/i18n/LanguageContext";
 import { buildTheme } from "../src/theme/index";
 
@@ -48,7 +49,10 @@ export default function RootLayout() {
 
     return (
         <LanguageProvider>
+            <AuthProvider>
+
             <AppShell />
+            </AuthProvider>
         </LanguageProvider>
     );
 }
