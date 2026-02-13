@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "387187294791",
+    "project_id": "zemenawi-defter-8a6ae",
+    "storage_bucket": "zemenawi-defter-8a6ae.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:387187294791:android:9012bd698e019686bda762",
+        "android_client_info": {
+          "package_name": "com.wedi_nachew.zemenawi_defter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBWpoImjYJ-UqivXcau_gdOCVI5aLrWqgc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
