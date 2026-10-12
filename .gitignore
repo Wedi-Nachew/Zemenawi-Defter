@@ -9,7 +9,7 @@ dist/
 web-build/
 expo-env.d.ts
 
-# Native
+# Native builds & outputs
 .kotlin/
 *.orig.*
 *.jks
@@ -17,33 +17,48 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+*.apk
+*.aab
+*.ipa
+*.xcarchive
 
 # Metro
 .metro-health-check*
 
-# debug
+# Logs & debug
+*.log
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+pnpm-debug.*
 
-# macOS
+# Operating System files
 .DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 *.pem
 
-# local env files
-.env*.local
+# Local env files
+.env
+.env.*
+!.env.example
 
-# typescript
+# Typescript & linters
 *.tsbuildinfo
+.eslintcache
 
 app-example
 
-# generated native folders
+# Generated native folders
 /ios
 /android
 
-# AI agent generated code
-.qoder/
-.github/
+# IDE and AI tools
+.idea/
+*.swp
+*.swo
 .vscode/
+.github/
+.qoder/
 
